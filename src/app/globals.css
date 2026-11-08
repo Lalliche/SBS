@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   SBS 360° design tokens — see docs/design-system.md
+   Spacing/radius/text scales are expressed in `em` so the whole UI
+   rescales from the <body> font-size (kit rule). `p-4` = 1em.
+   ------------------------------------------------------------------ */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-bg: #ffffff;
+  --color-canvas: #f7f5f0;
+  --color-paper: #f3f0ea;
+  --color-paper-deep: #e7e1d4;
+  --color-ink: #050703;
+  --color-ink-soft: #14170f;
+  --color-ink-line: #262a20;
+  --color-text: #16181a;
+  --color-text-secondary: #555759;
+  --color-text-muted: #77797a;
+  --color-border: #e6e1d6;
+  --color-border-strong: #cfc9bb;
+  --color-accent: #e4042c;
+  --color-accent-deep: #b80323;
+  --color-accent-soft: #fdebee;
+  --color-success: #1f7a4d;
+  --color-success-bg: #eaf6ef;
+  --color-warning: #a8620a;
+  --color-warning-bg: #fff4e0;
+  --color-danger: #b42318;
+  --color-danger-bg: #fef1ef;
+  --color-info: #1d4e89;
+  --color-info-bg: #ebf1f9;
+  --color-series-pairs: #2f6f5e;
+  --color-series-team: #b7791f;
+  --color-series-archive: #9a978e;
+
+  --spacing: 0.25em;
+
+  --radius-xs: 0.125em;
+  --radius-sm: 0.1875em;
+  --radius-md: 0.25em;
+  --radius-lg: 0.375em;
+  --radius-xl: 0.5em;
+  --radius-2xl: 0.75em;
+
+  --text-xs: 0.75em;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.8125em;
+  --text-sm--line-height: 1.5;
+  --text-base: 0.875em;
+  --text-base--line-height: 1.55;
+  --text-md: 1em;
+  --text-md--line-height: 1.5;
+  --text-lg: 1.25em;
+  --text-lg--line-height: 1.35;
+  --text-xl: 1.5em;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 2em;
+  --text-2xl--line-height: 1.15;
+
+  --font-sans: var(--font-ui), "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-playfair), "Times New Roman", serif;
+
+  --breakpoint-xs: 500px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 850px;
+  --breakpoint-lg: 1150px;
+  --breakpoint-xl: 1350px;
+  --breakpoint-xxl: 1800px;
+  --breakpoint-xxxl: 2200px;
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-marquee: marquee 48s linear infinite;
+  --animate-hero-in: hero-in 0.9s var(--ease-out-expo) both;
+}
+
+:root {
+  --shadow-xs: 0 1px 2px rgb(5 7 3 / 0.05);
+  --shadow-sm: 0 1px 3px rgb(5 7 3 / 0.07), 0 1px 2px rgb(5 7 3 / 0.04);
+  --shadow-md: 0 6px 16px -4px rgb(5 7 3 / 0.1), 0 2px 6px -2px rgb(5 7 3 / 0.06);
+  --shadow-lg: 0 14px 34px -8px rgb(5 7 3 / 0.16), 0 4px 10px -4px rgb(5 7 3 / 0.08);
+  --shadow-xl: 0 32px 70px -18px rgb(5 7 3 / 0.28), 0 10px 24px -10px rgb(5 7 3 / 0.12);
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #050703;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.shadow-xs { box-shadow: var(--shadow-xs); }
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+/* Slim scrollbars for the app shell */
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent; }
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes marquee {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes hero-in {
+  from { opacity: 0; transform: translate3d(0, 0.75em, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  /* Printable A4 sheet (synthesis PDF preview): everything else is hidden. */
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: fixed; inset: 0; width: 100% !important; max-width: none !important; aspect-ratio: auto !important; border: 0; box-shadow: none; font-size: 1.1em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

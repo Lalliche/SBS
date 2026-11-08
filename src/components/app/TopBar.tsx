@@ -1,0 +1,102 @@
+"use client";
+import { CircleHelp, LogOut, Menu, Search, Send, UserCircle2, BookOpen, Route } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { enterAs } from "@/lib/store/store";
+import { fullName, roleLabel } from "@/lib/store/engine";
+import { useSession } from "@/lib/store/hooks";
+import { Avatar } from "@/components/ui/Avatar";
+import { Button, IconButton } from "@/components/ui/Button";
+import { MenuItem, Popover } from "@/components/ui/Popover";
+import { CRUMBS } from "./nav-config";
+import { NotificationsPopover } from "./NotificationsPopover";
+import { useShell } from "./ShellContext";
+
+export function TopBar({ onMenu }: { onMenu: () => void }) {
+  const { s, me, can } = useSession();
+  const path = usePathname();
+  const router = useRouter();
+  const shell = useShell();
+  if (!me) return null;
+  const segs = path.split("/").filter(Boolean).slice(1);
+  const crumbs = segs.map((sg, i) => {
+    const href = "/" + ["app", ...segs.slice(0, i + 1)].join("/");
+    let label = CRUMBS[sg];
+    if (!label) {
+      label = s.missions.find((m) => m.id === sg)?.name ?? (s.users.find((u) => u.id === sg) ? fullName(s.users.find((u) => u.id === sg)!) : sg);
+    }
+    return { label, href: i < segs.length - 1 ? href : undefined };
+  });
+  const dept = s.departments.find((d) => d.id === me.departmentId);
+  return (
+    <header className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-bg px-4 md:px-6">
+      <IconButton label="Ouvrir le menu" onClick={onMenu} className="md:hidden">
+        <Menu className="size-5" />
+      </IconButton>
+      <nav aria-label="Fil d’Ariane" className="hidden min-w-0 items-center gap-1.5 text-sm text-text-muted sm:flex">
+        <Link href="/app/accueil" className="transition-colors hover:text-text">
+          SBS 360°
+        </Link>
+        {crumbs.map((c, i) => (
+          <span key={i} className="flex min-w-0 items-center gap-1.5">
+            <span aria-hidden>/</span>
+            {c.href ? (
+              <Link href={c.href} className="truncate transition-colors hover:text-text">
+                {c.label}
+              </Link>
+            ) : (
+              <span className="truncate font-medium text-text">{c.label}</span>
+            )}
+          </span>
+        ))}
+      </nav>
+      <span className="flex-1" />
+      <button type="button" onClick={shell.openPalette} data-tour="search" className="hidden h-9 w-[16em] items-center gap-2.5 rounded-md border border-border-strong bg-canvas px-3 text-sm text-text-muted transition-colors hover:border-ink/40 hover:bg-bg focus-visible:outline-none md:flex">
+        <Search className="size-4" />
+        <span className="flex-1 text-start">Rechercher…</span>
+        <kbd className="rounded border border-border bg-bg px-1.5 text-xs">⌘K</kbd>
+      </button>
+      <IconButton label="Rechercher" onClick={shell.openPalette} className="md:hidden">
+        <Search className="size-5" />
+      </IconButton>
+      {can("feedback.give") && (
+        <span data-tour="give">
+          <Button onClick={() => router.push("/app/feedback/nouveau")} icon={<Send className="size-4" />}>
+            <span className="max-sm:hidden">Donner un feedback</span>
+            <span className="sm:hidden">Donner</span>
+          </Button>
+        </span>
+      )}
+      <NotificationsPopover />
+      <IconButton label="Aide" onClick={shell.openHelp}>
+        <CircleHelp className="size-[1.15em]" />
+      </IconButton>
+      <Popover
+        label="Menu utilisateur"
+        width="17em"
+        trigger={({ toggle, ref }) => (
+          <button ref={ref} type="button" onClick={toggle} aria-label="Menu utilisateur" className="rounded-full focus-visible:outline-none">
+            <Avatar user={me} dept={dept} size="md" />
+          </button>
+        )}
+      >
+        {(close) => (
+          <div role="menu">
+            <div className="border-b border-border px-3 py-3">
+              <p className="text-base font-semibold text-ink">{fullName(me)}</p>
+              <p className="text-xs text-text-muted">{roleLabel[me.role]}</p>
+            </div>
+            <div className="py-1">
+              <MenuItem icon={<UserCircle2 />} onClick={() => { close(); shell.openProfile(); }}>Mon profil</MenuItem>
+              <MenuItem icon={<BookOpen />} onClick={() => { close(); router.push("/app/aide"); }}>Aide</MenuItem>
+              <MenuItem icon={<Route />} onClick={() => { close(); shell.startTour(); }}>Relancer la visite guidée</MenuItem>
+            </div>
+            <div className="border-t border-border py-1">
+              <MenuItem icon={<LogOut />} onClick={() => { close(); enterAs(null); router.push("/"); }}>Se déconnecter</MenuItem>
+            </div>
+          </div>
+        )}
+      </Popover>
+    </header>
+  );
+}
