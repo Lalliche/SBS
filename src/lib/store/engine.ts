@@ -8,11 +8,11 @@ import type {
   Grade,
   GradeBand,
   NamedFeedback,
+  PendingTask,
   Question,
   QuotaRule,
   Relation,
   Role,
-  Settings,
   User,
 } from "./types";
 
@@ -121,11 +121,28 @@ export interface QuotaProgress {
   directTarget: number;
   needsFromTeam: boolean;
   teamFeedback: number;
-  ratio: number; // 0..1 (capped)
+  ratio: number; // received / target, 0..1 (capped)
   reached: boolean;
   missing: number;
   missingDirect: number;
+  /** Feedback GIVEN (CDC 3.10): named sends + requests answered (never reveals named vs anonymous). */
+  given: number;
+  minGiven: number;
+  missingGiven: number;
+  /** Giving is mandatory for this user's grade (CDC 3.5). */
+  mandatory: boolean;
   status: "ATTEINT" | "EN_BONNE_VOIE" | "EN_RETARD";
+}
+
+/**
+ * Given = named feedback sent + requests answered whose answer is not already counted as a named send.
+ * Spontaneous anonymous sends cannot be attributed to anyone, by design (anonymity), so they are not counted.
+ */
+export function givenCount(userId: string, named: NamedFeedback[], tasks: PendingTask[]): number {
+  const sent = named.filter((f) => f.authorId === userId && f.status === "ENVOYE");
+  const namedForRequest = new Set(sent.map((f) => f.requestId).filter(Boolean));
+  const answeredOther = tasks.filter((t) => t.giverId === userId && t.status === "TRAITEE" && !namedForRequest.has(t.requestId)).length;
+  return sent.length + answeredOther;
 }
 
 export function quotaProgress(args: {
@@ -133,12 +150,12 @@ export function quotaProgress(args: {
   users: User[];
   named: NamedFeedback[];
   anonymous: AnonymousFeedback[];
+  tasks: PendingTask[];
   rule: QuotaRule;
-  countsMode: Settings["countsMode"];
   anonymousCounts: boolean;
   cycleProgress: number; // 0..1 elapsed share of the cycle
 }): QuotaProgress {
-  const { user, users, named, anonymous, rule, countsMode, anonymousCounts, cycleProgress } = args;
+  const { user, users, named, anonymous, tasks, rule, anonymousCounts, cycleProgress } = args;
   const reports = new Set(users.filter((u) => u.leaderIds.includes(user.id)).map((u) => u.id));
   const leaders = new Set(user.leaderIds);
   // "Direct" = the person's leader or direct reports (their direct circle).
@@ -146,33 +163,32 @@ export function quotaProgress(args: {
   let received = 0;
   let fromDirect = 0;
   let teamFeedback = 0;
-  if (countsMode === "RECUS") {
-    const nm = named.filter((f) => f.recipientId === user.id && f.status === "ENVOYE");
-    received += nm.length;
-    for (const f of nm) {
-      if (isDirect(f.authorId)) fromDirect += 1;
-      if (reports.has(f.authorId)) teamFeedback += 1;
-    }
-    if (anonymousCounts) {
-      const an = anonymous.filter((f) => f.recipientId === user.id);
-      received += an.length;
-      // The author of an anonymous feedback is unknown; only its (optional) relation is.
-      fromDirect += an.filter((f) => f.relation === "EQUIPE" || f.relation === "RESPONSABLE").length;
-      teamFeedback += an.filter((f) => f.relation === "EQUIPE").length;
-    }
-  } else {
-    received = named.filter((f) => f.authorId === user.id && f.status === "ENVOYE").length;
-    // "given" mode can only count named sends: anonymous authors are not stored (by design)
+  const nm = named.filter((f) => f.recipientId === user.id && f.status === "ENVOYE");
+  received += nm.length;
+  for (const f of nm) {
+    if (isDirect(f.authorId)) fromDirect += 1;
+    if (reports.has(f.authorId)) teamFeedback += 1;
   }
+  if (anonymousCounts) {
+    const an = anonymous.filter((f) => f.recipientId === user.id);
+    received += an.length;
+    // The author of an anonymous feedback is unknown; only its (optional) relation is.
+    fromDirect += an.filter((f) => f.relation === "EQUIPE" || f.relation === "RESPONSABLE").length;
+    teamFeedback += an.filter((f) => f.relation === "EQUIPE").length;
+  }
+  const given = givenCount(user.id, named, tasks);
   const isLeader = reports.size > 0;
   const needsFromTeam = isLeader && rule.teamLeaderNeedsTeamFeedback;
   const directTarget = rule.minFromDirectReports;
   const target = rule.minReceived;
   const missing = Math.max(0, target - received);
   const missingDirect = Math.max(0, directTarget - fromDirect) + (needsFromTeam && teamFeedback === 0 ? 1 : 0);
-  const reached = missing === 0 && missingDirect === 0;
+  const missingGiven = Math.max(0, rule.minGiven - given);
+  const mandatory = rule.mandatory.enabled && rule.mandatory.grades.includes(user.grade);
+  const reached = missing === 0 && missingDirect === 0 && missingGiven === 0;
   const expected = target * cycleProgress;
-  const status: QuotaProgress["status"] = reached ? "ATTEINT" : received >= expected * 0.75 ? "EN_BONNE_VOIE" : "EN_RETARD";
+  const behind = received < expected * 0.75 || (mandatory && given < rule.minGiven * cycleProgress * 0.75);
+  const status: QuotaProgress["status"] = reached ? "ATTEINT" : behind ? "EN_RETARD" : "EN_BONNE_VOIE";
   return {
     received,
     fromDirectReports: fromDirect,
@@ -184,6 +200,10 @@ export function quotaProgress(args: {
     reached,
     missing,
     missingDirect,
+    given,
+    minGiven: rule.minGiven,
+    missingGiven,
+    mandatory,
     status,
   };
 }
@@ -219,7 +239,6 @@ export type Action =
   | "feedback.give"
   | "request.create"
   | "mission.create"
-  | "mission.viewAll"
   | "team.view"
   | "synthesis.write"
   | "cycle.manage"
@@ -237,13 +256,12 @@ export type Action =
 const MATRIX: Record<Action, Role[]> = {
   "feedback.give": ["COLLABORATEUR", "RESPONSABLE", "ADMIN_RH"],
   "request.create": ["COLLABORATEUR", "RESPONSABLE", "ADMIN_RH"],
-  "mission.create": ["ADMIN_RH"],
-  "mission.viewAll": ["ADMIN_RH"],
+  "mission.create": ["RESPONSABLE"], // CDC 3.1: missions are managed by responsables, never by HR
   "team.view": ["RESPONSABLE"],
   "synthesis.write": ["RESPONSABLE"],
   "cycle.manage": ["ADMIN_RH"],
   "follow.view": ["ADMIN_RH"],
-  "clientlink.manage": ["ADMIN_RH"],
+  "clientlink.manage": ["COLLABORATEUR", "RESPONSABLE"], // the responsable de mission or the collaborateur concerned
   "users.directory": ["ADMIN_RH", "ADMIN_TECH", "RESPONSABLE"],
   "referentials.edit": ["ADMIN_RH"],
   "messages.manage": ["ADMIN_RH"],
@@ -261,7 +279,7 @@ export function can(user: Pick<User, "role"> | null | undefined, action: Action)
 
 export const roleLabel: Record<Role, string> = {
   COLLABORATEUR: "Collaborateur",
-  RESPONSABLE: "Responsable d’équipe",
+  RESPONSABLE: "Responsable d’équipe / de mission",
   ADMIN_RH: "Admin RH",
   ADMIN_TECH: "Admin technique",
 };

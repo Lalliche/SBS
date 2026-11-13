@@ -11,9 +11,9 @@ import { activeUsers, quotaFor, rhKpis } from "@/lib/store/selectors";
 import { Guard } from "@/components/app/Guard";
 import { Kpi } from "@/components/app/Kpi";
 import { PersonChip } from "@/components/ui/Avatar";
-import { StatusPill } from "@/components/ui/Badge";
+import { Badge, StatusPill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Field, SegmentedControl, SelectInput, Switch, TextInput } from "@/components/ui/FormInputs";
+import { Checkbox, SegmentedControl, SelectInput, Switch, TextInput } from "@/components/ui/FormInputs";
 import { Modal } from "@/components/ui/Overlay";
 import { Callout, Card, CardHeader, PageHeader } from "@/components/ui/Surface";
 import { Tabs } from "@/components/ui/Tabs";
@@ -60,7 +60,7 @@ export default function CyclePage({ params }: PageProps<"/app/cycles/[id]">) {
           </Card>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi label="Feedbacks" value={fbCount} hint={archived ? "sur le cycle" : `${k.named} nominatifs · ${k.anonymous} anonymes`} />
-            <Kpi label="Missions" value={s.missions.filter((m) => m.cycleId === c.id).length} hint="rattachées au cycle" href="/app/missions" />
+            <Kpi label="Missions" value={s.missions.filter((m) => m.cycleId === c.id).length} hint="rattachées au cycle" />
             <Kpi label="Synthèses validées" value={syn.filter((x) => x.status === "VALIDEE").length} hint={`sur ${syn.length}`} />
             <Kpi label="Sous l’objectif" value={archived ? 0 : behind.length} hint="collaborateurs à relancer" href="/app/suivi" tone={behind.length ? "warn" : "default"} />
           </div>
@@ -72,12 +72,22 @@ export default function CyclePage({ params }: PageProps<"/app/cycles/[id]">) {
           <Card>
             <CardHeader title="Objectifs de feedback" description="Valables pour tous les collaborateurs du cycle." />
             <div className="flex flex-col gap-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <TextInput label="Minimum de feedbacks reçus" type="number" value={String(c.quotaRule.minReceived)} onChange={(v) => act((d) => setQuota(d, me.id, c.id, { minReceived: Math.max(1, Number(v) || 1) }))} />
+                <TextInput label="Minimum de feedbacks donnés" type="number" value={String(c.quotaRule.minGiven)} onChange={(v) => act((d) => setQuota(d, me.id, c.id, { minGiven: Math.max(0, Number(v) || 0) }))} />
                 <TextInput label="dont de collaborateurs directs" type="number" value={String(c.quotaRule.minFromDirectReports)} onChange={(v) => act((d) => setQuota(d, me.id, c.id, { minFromDirectReports: Math.max(0, Number(v) || 0) }))} />
               </div>
+              <div className="rounded-lg border border-border p-4">
+                <div className="flex items-center justify-between"><div><p className="text-base font-medium text-ink">Retour obligatoire</p><p className="text-sm text-text-secondary">Certains profils doivent donner leur minimum de feedbacks.</p></div><Switch checked={c.quotaRule.mandatory.enabled} onChange={(v) => act((d) => setQuota(d, me.id, c.id, { mandatory: { ...c.quotaRule.mandatory, enabled: v } }))} label="Retour obligatoire" /></div>
+                {c.quotaRule.mandatory.enabled && (
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-3">
+                    {(["Junior", "Consultant", "Senior", "Manager", "Directeur"] as const).map((g) => (
+                      <Checkbox key={g} checked={c.quotaRule.mandatory.grades.includes(g)} onChange={(on) => act((d) => setQuota(d, me.id, c.id, { mandatory: { ...c.quotaRule.mandatory, grades: on ? [...c.quotaRule.mandatory.grades, g] : c.quotaRule.mandatory.grades.filter((x) => x !== g) } }))} label={g} />
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between"><span className="text-base text-text">Un responsable doit recevoir des retours de son équipe</span><Switch checked={c.quotaRule.teamLeaderNeedsTeamFeedback} onChange={(v) => act((d) => setQuota(d, me.id, c.id, { teamLeaderNeedsTeamFeedback: v }))} label="Retours de l’équipe obligatoires" /></div>
-              <Field label="Compter les feedbacks"><SegmentedControl label="Mode de comptage" value={s.settings.countsMode} onChange={(v) => act((d) => { d.settings.countsMode = v; })} options={[{ value: "RECUS", label: "Reçus" }, { value: "DONNES", label: "Donnés" }]} /></Field>
               <div className="flex items-center justify-between"><span className="text-base text-text">Les feedbacks anonymes comptent</span><Switch checked={s.settings.visibility.anonymousCountsInQuota} onChange={(v) => act((d) => { d.settings.visibility.anonymousCountsInQuota = v; })} label="Les feedbacks anonymes comptent" /></div>
               <Callout tone="info">Avec ces règles, l’objectif concerne <b className="tabular-nums">{behind.length}</b> collaborateur{behind.length > 1 ? "s" : ""} encore sous le seuil.</Callout>
             </div>
@@ -102,7 +112,7 @@ export default function CyclePage({ params }: PageProps<"/app/cycles/[id]">) {
             <p className="mt-4 text-xs text-text-muted">Rappel : « {c.reminderRules.find((r) => r.enabled)?.label ?? "—"} » concerne {impacted(c.reminderRules.find((r) => r.enabled)?.kind ?? "")} collaborateurs.</p>
           </Card>
           <Card className="xl:col-span-2">
-            <CardHeader title="Intelligence artificielle" description="Option activable à tout moment. Elle ne modifie jamais une note et ne publie rien sans validation." />
+            <CardHeader title="Intelligence artificielle" description="Option sur devis, non incluse dans la plateforme livrée : les points forts et axes sont rédigés par le responsable. L’aperçu ci-dessous sert à la démonstration." action={<Badge tone="violet">Option sur devis</Badge>} />
             <SegmentedControl label="Mode IA" value={c.aiMode} onChange={(v) => act((d) => setAiMode(d, me.id, v))} options={[{ value: "OFF", label: "Désactivée" }, { value: "MANUEL", label: "Rédaction par le responsable seul" }, { value: "ASSISTE", label: "Rédaction assistée par l’IA" }]} />
           </Card>
         </div>

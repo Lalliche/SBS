@@ -1,13 +1,14 @@
 "use client";
-import { Check, Copy, Download, ExternalLink, GripVertical, Link2, MoreHorizontal, Plus, QrCode as QrIcon, Send, X } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, GripVertical, Link2, MoreHorizontal, Plus, Send, X } from "lucide-react";
 import { Reorder } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { act } from "@/lib/store/store";
-import { createClientLink, duplicateLink, extendLink, setLinkStatus } from "@/lib/store/actions";
+import { createClientLink, extendLink, remindClient, sendClientLinkEmail, setLinkStatus } from "@/lib/store/actions";
 import { addDays, clientLinkValidity, fmtDate, relDate } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
+import { visibleClientLinks } from "@/lib/store/selectors";
 import { useQueryState } from "@/lib/use-query-state";
 import type { ClientLink } from "@/lib/store/types";
 import { Guard } from "@/components/app/Guard";
@@ -15,7 +16,7 @@ import { QrCode } from "@/components/feedback/QrCode";
 import { Badge, StatusPill } from "@/components/ui/Badge";
 import { Button, IconButton } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
-import { Field, SegmentedControl, SelectInput, Switch, TextArea, TextInput } from "@/components/ui/FormInputs";
+import { Field, SelectInput, Switch, TextArea, TextInput } from "@/components/ui/FormInputs";
 import { Drawer, Modal } from "@/components/ui/Overlay";
 import { MenuItem, Popover } from "@/components/ui/Popover";
 import { Callout, EmptyState, PageHeader } from "@/components/ui/Surface";
@@ -24,30 +25,41 @@ import { useShell } from "@/components/app/ShellContext";
 import { CLIENT_QUESTIONS } from "@/lib/store/texts";
 
 const origin = () => (typeof window === "undefined" ? "" : window.location.origin);
+interface Preset {
+  missionId?: string;
+  title?: string;
+  welcome?: string;
+  questionIds?: string[];
+}
 
-function Wizard({ onClose, presetMission, onCreated }: { onClose: () => void; presetMission?: string; onCreated: (l: ClientLink) => void }) {
+function Wizard({ onClose, preset, onCreated }: { onClose: () => void; preset: Preset; onCreated: (l: ClientLink) => void }) {
   const { s, me } = useSession();
   const [step, setStep] = useState(0);
-  const [mission, setMission] = useState(presetMission ?? "");
-  const [title, setTitle] = useState("");
-  const [welcome, setWelcome] = useState("Merci de prendre quelques minutes pour partager votre retour sur la mission.");
-  const [qs, setQs] = useState<string[]>(CLIENT_QUESTIONS.map((q) => q.id));
+  const [mission, setMission] = useState(preset.missionId ?? "");
+  const [client, setClient] = useState({ name: "", company: "", email: "" });
+  const [title, setTitle] = useState(preset.title ?? "");
+  const [welcome, setWelcome] = useState(preset.welcome ?? "Merci de prendre quelques minutes pour partager votre retour sur la mission.");
+  const [qs, setQs] = useState<string[]>(preset.questionIds ?? CLIENT_QUESTIONS.map((q) => q.id));
   const [custom, setCustom] = useState("");
   const [extra, setExtra] = useState<Array<{ id: string; text: string }>>([]);
   const [expires, setExpires] = useState(addDays(s.now, 30).slice(0, 10));
-  const [max, setMax] = useState("10");
-  const [ident, setIdent] = useState<ClientLink["identification"]>("FACULTATIVE");
+  const [max, setMax] = useState("1");
   const [active, setActive] = useState(true);
+  const [touched, setTouched] = useState(false);
+  if (!me) return null;
+  const myMissions = s.missions.filter((m) => m.leadId === me.id || m.participantIds.includes(me.id));
   const defaultTitle = (() => {
     const m = s.missions.find((x) => x.id === mission);
     return m ? `Votre avis sur notre accompagnement — ${m.name}` : "";
   })();
   const effTitle = title || defaultTitle;
-  if (!me) return null;
   const all = [...CLIENT_QUESTIONS, ...extra];
-  const valid = [!!mission && !!effTitle.trim(), qs.length > 0, !!expires && Number(max) > 0][step];
+  const emailOk = /.+@.+\..+/.test(client.email);
+  const errs = { mission: !mission ? "Choisissez une mission." : null, name: !client.name.trim() ? "Nom du client obligatoire." : null, company: !client.company.trim() ? "Entreprise obligatoire." : null, email: !emailOk ? "Adresse e-mail valide obligatoire." : null };
+  const step0 = !Object.values(errs).some(Boolean) && !!effTitle.trim();
+  const valid = [step0, qs.length > 0, !!expires && Number(max) > 0][step];
   const finish = () => {
-    const link = act((d) => createClientLink(d, me.id, { missionId: mission, title: effTitle.trim(), welcome, questionIds: qs, expiresAt: new Date(expires + "T23:59:00Z").toISOString(), maxResponses: Math.max(1, Number(max) || 1), identification: ident, active }));
+    const link = act((d) => createClientLink(d, me.id, { missionId: mission, clientName: client.name.trim(), company: client.company.trim(), clientEmail: client.email.trim(), title: effTitle.trim(), welcome, questionIds: qs, expiresAt: new Date(expires + "T23:59:00Z").toISOString(), maxResponses: Math.max(1, Number(max) || 1), active }));
     onCreated(link);
   };
   return (
@@ -55,9 +67,20 @@ function Wizard({ onClose, presetMission, onCreated }: { onClose: () => void; pr
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-bg px-6"><p className="text-md font-semibold text-ink">Créer un lien client</p><Button variant="ghost" size="sm" icon={<X className="size-4" />} onClick={onClose}>Fermer</Button></header>
       <div className="mx-auto grid w-full max-w-[72em] flex-1 gap-8 overflow-y-auto px-6 py-8 lg:grid-cols-[1fr_20em]">
         <div>
-          <ol className="mb-6 flex gap-2">{["Mission et titre", "Questions", "Paramètres"].map((t, i) => <li key={t} className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-sm", i === step ? "bg-ink text-white" : i < step ? "bg-paper text-ink" : "text-text-muted")}>{i < step ? <Check className="size-3.5" /> : <span className="tabular-nums">{i + 1}</span>}{t}</li>)}</ol>
+          <ol className="mb-6 flex gap-2">{["Mission et client", "Questions", "Paramètres"].map((t, i) => <li key={t} className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-sm", i === step ? "bg-ink text-white" : i < step ? "bg-paper text-ink" : "text-text-muted")}>{i < step ? <Check className="size-3.5" /> : <span className="tabular-nums">{i + 1}</span>}{t}</li>)}</ol>
           <div className="rounded-xl border border-border bg-bg p-6 sm:p-8">
-            {step === 0 && <div className="flex flex-col gap-5"><SelectInput label="Mission" required value={mission} onChange={(v) => { setMission(v); setTitle(""); }} placeholder="Choisir une mission" options={s.missions.map((m) => ({ value: m.id, label: m.name }))} /><TextInput label="Titre affiché au client" required value={effTitle} onChange={setTitle} /><TextArea label="Message d’accueil" value={welcome} onChange={setWelcome} rows={3} max={300} /></div>}
+            {step === 0 && (
+              <div className="flex flex-col gap-5">
+                <SelectInput label="Mission" required value={mission} onChange={(v) => { setMission(v); setTitle(""); }} placeholder="Choisir une mission" options={myMissions.map((m) => ({ value: m.id, label: `${m.name} · ${m.otp}` }))} hint={touched ? (errs.mission ?? undefined) : undefined} />
+                <fieldset className="flex flex-col gap-4 rounded-lg border border-border p-4">
+                  <legend className="px-1 text-sm font-medium text-ink">Le client — un lien correspond à un seul client</legend>
+                  <div className="grid gap-4 sm:grid-cols-2"><TextInput label="Nom du client" required value={client.name} onChange={(v) => setClient({ ...client, name: v })} error={touched ? errs.name : null} /><TextInput label="Entreprise" required value={client.company} onChange={(v) => setClient({ ...client, company: v })} error={touched ? errs.company : null} /></div>
+                  <TextInput label="Adresse e-mail" required type="email" value={client.email} onChange={(v) => setClient({ ...client, email: v })} error={touched ? errs.email : null} hint="Le lien ne pourra pas être réutilisé pour un autre client." />
+                </fieldset>
+                <TextInput label="Titre affiché au client" required value={effTitle} onChange={setTitle} />
+                <TextArea label="Message d’accueil" value={welcome} onChange={setWelcome} rows={3} max={300} />
+              </div>
+            )}
             {step === 1 && (
               <div className="flex flex-col gap-4">
                 <p className="text-sm text-text-secondary">Choisissez et réordonnez les questions (glissez ou cochez).</p>
@@ -70,21 +93,20 @@ function Wizard({ onClose, presetMission, onCreated }: { onClose: () => void; pr
             )}
             {step === 2 && (
               <div className="flex flex-col gap-5">
-                <div className="grid gap-4 sm:grid-cols-2"><Field label="Date d’expiration" required><input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="h-9 w-full rounded-md border border-border-strong bg-bg px-3 text-base focus-visible:outline-none focus-visible:border-ink" /></Field><TextInput label="Nombre maximal de réponses" type="number" value={max} onChange={setMax} /></div>
-                <Field label="Identification du client"><SegmentedControl label="Identification" value={ident} onChange={setIdent} options={[{ value: "AUCUNE", label: "Aucune" }, { value: "FACULTATIVE", label: "Facultative" }, { value: "OBLIGATOIRE", label: "Obligatoire" }]} /></Field>
-                <Callout tone="neutral" title="Protection contre les abus">Une seule réponse par appareil est acceptée (limite souple). Aucun compte ni donnée personnelle n’est requis du client.</Callout>
+                <div className="grid gap-4 sm:grid-cols-2"><Field label="Date d’expiration" required><input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="h-9 w-full rounded-md border border-border-strong bg-bg px-3 text-base focus-visible:outline-none focus-visible:border-ink" /></Field><TextInput label="Nombre de réponses autorisées" type="number" value={max} onChange={setMax} hint="1 par défaut : un lien, un client, une réponse." /></div>
+                <Callout tone="neutral" title="Un lien par client">La plateforme sait toujours quel client a reçu quel lien et lequel a répondu. Le client n’a ni compte ni mot de passe, et une seule réponse par appareil est acceptée.</Callout>
                 <div className="flex items-center justify-between"><span className="text-base text-text">Activer le lien</span><Switch checked={active} onChange={setActive} label="Activer le lien" /></div>
               </div>
             )}
             <div className="mt-8 flex items-center justify-between border-t border-border pt-5">
               <Button variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)}>Retour</Button>
-              {step < 2 ? <Button onClick={() => setStep(step + 1)} disabled={!valid}>Continuer</Button> : <Button onClick={finish} disabled={!valid}>Créer le lien</Button>}
+              {step < 2 ? <Button onClick={() => { if (step === 0 && !step0) return setTouched(true); setStep(step + 1); }} disabled={step === 1 && !valid}>Continuer</Button> : <Button onClick={finish} disabled={!valid}>Créer le lien</Button>}
             </div>
-            {!valid && <p className="mt-3 text-xs text-warning">{step === 0 ? "Choisissez une mission et donnez un titre." : step === 1 ? "Gardez au moins une question." : "Renseignez une date et un nombre de réponses."}</p>}
+            {step === 0 && touched && !step0 && <p role="alert" className="mt-3 text-xs text-danger">Complétez la mission, le client (nom, entreprise, e-mail) et le titre.</p>}
           </div>
         </div>
         <aside aria-label="Aperçu téléphone" className="lg:sticky lg:top-0 lg:self-start"><p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-text-muted">Aperçu client</p>
-          <div className="mx-auto w-[17em] rounded-[2em] border-[0.5em] border-ink bg-bg p-4 shadow-lg"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent">SBS</p><p className="mt-1.5 text-base font-semibold leading-snug text-ink">{effTitle || "Titre du lien"}</p><p className="mt-1.5 text-xs text-text-secondary">{welcome}</p><div className="mt-4 flex flex-col gap-3">{qs.slice(0, 3).map((id) => <div key={id}><p className="text-xs font-medium text-ink">{all.find((q) => q.id === id)?.text}</p><div className="mt-1.5 h-8 rounded border border-border-strong bg-canvas" /></div>)}</div></div>
+          <div className="mx-auto w-[17em] rounded-[2em] border-[0.5em] border-ink bg-bg p-4 shadow-lg"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent">SBS</p><p className="mt-1.5 text-xs text-text-muted">Bonjour {client.name.split(" ")[0] || "…"},</p><p className="mt-1 text-base font-semibold leading-snug text-ink">{effTitle || "Titre du lien"}</p><p className="mt-1.5 text-xs text-text-secondary">{welcome}</p><div className="mt-4 flex flex-col gap-3">{qs.slice(0, 3).map((id) => <div key={id}><p className="text-xs font-medium text-ink">{all.find((q) => q.id === id)?.text}</p><div className="mt-1.5 h-8 rounded border border-border-strong bg-canvas" /></div>)}</div></div>
         </aside>
       </div>
     </div>
@@ -97,7 +119,7 @@ export default function FeedbackClientPage() {
   const q = useQueryState();
   const toast = useToast();
   const shell = useShell();
-  const [wiz, setWiz] = useState(q.get("nouveau") === "1");
+  const [wiz, setWiz] = useState<Preset | null>(q.get("nouveau") === "1" ? { missionId: q.get("mission") || undefined } : null);
   const [created, setCreated] = useState<ClientLink | null>(null);
   const [drawer, setDrawer] = useState<string | null>(q.get("link") || null);
   const [mailTo, setMailTo] = useState<ClientLink | null>(null);
@@ -105,68 +127,79 @@ export default function FeedbackClientPage() {
   const [chip, setChip] = useState("");
   if (!me) return null;
   const link = (l: ClientLink) => `${origin()}/c/${l.token}`;
-  const responsesOf = (l: ClientLink) => s.clientResponses.filter((r) => r.linkId === l.id);
-  const dl = drawer ? s.clientLinks.find((l) => l.id === drawer) : null;
+  const responseOf = (l: ClientLink) => s.clientResponses.find((r) => r.linkId === l.id);
+  const links = visibleClientLinks(s, me.id);
+  const dl = drawer ? links.find((l) => l.id === drawer) : null;
+  const openMail = (l: ClientLink) => { setChips([l.clientEmail]); setMailTo(l); };
+  const status = (l: ClientLink) => { const v = clientLinkValidity(l, s.clientResponses, s.now); return v; };
   return (
     <Guard action="clientlink.manage">
-      <PageHeader title="Feedback client" description="Un lien web par mission : le client répond sans créer de compte." actions={<Button icon={<Plus className="size-4" />} onClick={() => setWiz(true)}>Créer un lien</Button>} />
+      <PageHeader title="Retours client" description="Un lien par client, créé et envoyé par vous. Le client répond sans compte ; vous voyez qui a répondu." actions={<Button icon={<Plus className="size-4" />} onClick={() => setWiz({})}>Créer un lien</Button>} />
       <DataTable<ClientLink>
         caption="Liens client"
-        rows={s.clientLinks}
+        rows={links}
         getId={(l) => l.id}
         onRowClick={(l) => setDrawer(l.id)}
-        empty={<EmptyState icon={Link2} title="Aucun lien client" description="Recueillez le point de vue du client sur une mission." action={<Button onClick={() => setWiz(true)}>Créer le premier lien</Button>} />}
+        empty={<EmptyState icon={Link2} title="Aucun lien client" description="Recueillez le point de vue d’un client sur une mission : un lien par client." action={<Button onClick={() => setWiz({})}>Créer le premier lien</Button>} />}
         columns={[
-          { key: "m", header: "Mission", cell: (l) => <span className="font-medium text-ink">{s.missions.find((m) => m.id === l.missionId)?.name}</span> },
-          { key: "t", header: "Titre", hideBelow: "lg", cell: (l) => <span className="line-clamp-1 text-text-secondary">{l.title}</span> },
-          { key: "s", header: "Statut", cell: (l) => { const v = clientLinkValidity(l, s.clientResponses, s.now); return <StatusPill status={v === "OK" ? "ACTIF" : v === "DESACTIVE" ? "DESACTIVE" : v === "MAX_ATTEINT" ? "EXPIRE" : "EXPIRE"} label={v === "MAX_ATTEINT" ? "Complet" : undefined} />; } },
-          { key: "r", header: "Réponses", align: "end", cell: (l) => <span>{responsesOf(l).length} / {l.maxResponses}</span> },
-          { key: "e", header: "Expiration", hideBelow: "md", cell: (l) => <span className="text-text-secondary">{fmtDate(l.expiresAt)} <span className="text-text-muted">({relDate(s.now, l.expiresAt)})</span></span> },
+          { key: "c", header: "Client", sort: (a, b) => a.clientName.localeCompare(b.clientName), cell: (l) => <span className="leading-tight"><span className="block font-medium text-ink">{l.clientName}</span><span className="block text-xs text-text-muted">{l.company}</span></span> },
+          { key: "m", header: "Mission", hideBelow: "md", cell: (l) => <span className="line-clamp-1 text-text-secondary">{s.missions.find((m) => m.id === l.missionId)?.name}</span> },
+          { key: "s", header: "Statut", cell: (l) => { const v = status(l); return <StatusPill status={v === "OK" ? "ACTIF" : v === "MAX_ATTEINT" ? "TRAITEE" : v === "DESACTIVE" ? "DESACTIVE" : "EXPIRE"} label={v === "MAX_ATTEINT" ? "Répondu" : v === "OK" ? "En attente" : undefined} />; } },
+          { key: "e", header: "Expiration", hideBelow: "lg", cell: (l) => <span className="text-text-secondary">{fmtDate(l.expiresAt)} <span className="text-text-muted">({relDate(s.now, l.expiresAt)})</span></span> },
         ]}
         rowActions={(l) => (
           <Popover label="Actions" trigger={({ toggle, ref }) => <IconButton ref={ref} label="Actions" size="sm" onClick={toggle}><MoreHorizontal className="size-4" /></IconButton>}>
             {(close) => (
-              <div role="menu" className="min-w-[13em] py-1">
-                <MenuItem onClick={() => { close(); setDrawer(l.id); }}>Voir les réponses</MenuItem>
+              <div role="menu" className="min-w-[15em] py-1">
+                <MenuItem onClick={() => { close(); setDrawer(l.id); }}>{responseOf(l) ? "Voir la réponse" : "Voir le détail"}</MenuItem>
                 <MenuItem icon={<Copy />} onClick={() => { close(); navigator.clipboard?.writeText(link(l)); toast({ title: "Lien copié" }); }}>Copier le lien</MenuItem>
+                <MenuItem icon={<Send />} onClick={() => { close(); openMail(l); }}>Envoyer par e-mail</MenuItem>
+                {status(l) !== "MAX_ATTEINT" && <MenuItem onClick={() => { close(); act((d) => remindClient(d, me.id, l.id)); toast({ title: `Relance envoyée à ${l.clientName}`, body: l.clientEmail }); }}>Relancer le client</MenuItem>}
                 <MenuItem onClick={() => { close(); act((d) => extendLink(d, me.id, l.id, 14)); toast({ title: "Lien prolongé de 14 jours" }); }}>Prolonger</MenuItem>
                 <MenuItem onClick={() => { close(); act((d) => setLinkStatus(d, me.id, l.id, l.status === "DESACTIVE" ? "ACTIF" : "DESACTIVE")); toast({ title: l.status === "DESACTIVE" ? "Lien réactivé" : "Lien désactivé" }); }}>{l.status === "DESACTIVE" ? "Réactiver" : "Désactiver"}</MenuItem>
-                <MenuItem onClick={() => { close(); act((d) => duplicateLink(d, me.id, l.id)); toast({ title: "Lien dupliqué" }); }}>Dupliquer</MenuItem>
+                <MenuItem onClick={() => { close(); setWiz({ missionId: l.missionId, title: l.title, welcome: l.welcome, questionIds: l.questionIds }); }}>Nouveau lien pour un autre client</MenuItem>
               </div>
             )}
           </Popover>
         )}
       />
-      {wiz && <Wizard onClose={() => { setWiz(false); router.replace("/app/feedback-client"); }} presetMission={q.get("mission") || undefined} onCreated={(l) => { setWiz(false); setCreated(l); router.replace("/app/feedback-client"); }} />}
-      <Modal open={!!created} onClose={() => setCreated(null)} size="lg" title="Votre lien est prêt" subtitle={created?.title} footer={<><Button variant="ghost" onClick={() => setCreated(null)}>Terminer</Button><Button variant="secondary" icon={<ExternalLink className="size-4" />} onClick={() => { shell.openClientPreview(created!.token); setCreated(null); }}>Prévisualiser comme client</Button></>}>
+      {wiz && <Wizard preset={wiz} onClose={() => { setWiz(null); router.replace("/app/feedback-client"); }} onCreated={(l) => { setWiz(null); setCreated(l); router.replace("/app/feedback-client"); }} />}
+      <Modal open={!!created} onClose={() => setCreated(null)} size="lg" title="Le lien est prêt" subtitle={created ? `${created.clientName} · ${created.company}` : undefined} footer={<><Button variant="ghost" onClick={() => setCreated(null)}>Terminer</Button><Button variant="secondary" icon={<ExternalLink className="size-4" />} onClick={() => { shell.openClientPreview(created!.token); setCreated(null); }}>Prévisualiser comme client</Button></>}>
         {created && (
           <div className="grid gap-6 sm:grid-cols-[1fr_11em]">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-canvas p-1.5 ps-3"><span className="min-w-0 flex-1 truncate text-sm text-text">{link(created)}</span><Button size="sm" icon={<Copy className="size-4" />} onClick={() => { navigator.clipboard?.writeText(link(created)); toast({ title: "Lien copié" }); }}>Copier le lien</Button></div>
-              <Button variant="secondary" icon={<Send className="size-4" />} onClick={() => { setMailTo(created); setCreated(null); }}>Envoyer par e-mail</Button>
-              <Callout tone="neutral">Le lien expire le {fmtDate(created.expiresAt)} ou après {created.maxResponses} réponses.</Callout>
+              <Button variant="secondary" icon={<Send className="size-4" />} onClick={() => { openMail(created); setCreated(null); }}>Envoyer par e-mail à {created.clientName.split(" ")[0]}</Button>
+              <Callout tone="neutral">C’est vous qui envoyez le lien, par e-mail ou par QR code. Il est réservé à {created.clientName} et expire le {fmtDate(created.expiresAt)}.</Callout>
             </div>
             <div className="flex flex-col items-center gap-2"><QrCode seed={created.token} className="w-full rounded-lg border border-border" /><Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "QR code téléchargé" })}>Télécharger le QR</Button></div>
           </div>
         )}
       </Modal>
-      <Modal open={!!mailTo} onClose={() => setMailTo(null)} title="Envoyer le lien par e-mail" footer={<><Button variant="ghost" onClick={() => setMailTo(null)}>Annuler</Button><Button disabled={!chips.length} icon={<Send className="size-4" />} onClick={() => { toast({ title: `E-mail envoyé à ${chips.length} destinataire${chips.length > 1 ? "s" : ""}` }); setChips([]); setMailTo(null); }}>Envoyer</Button></>}>
+      <Modal open={!!mailTo} onClose={() => setMailTo(null)} title="Envoyer le lien par e-mail" footer={<><Button variant="ghost" onClick={() => setMailTo(null)}>Annuler</Button><Button disabled={!chips.length} icon={<Send className="size-4" />} onClick={() => { act((d) => sendClientLinkEmail(d, me.id, mailTo!.id, chips)); toast({ title: `E-mail envoyé à ${chips.length} destinataire${chips.length > 1 ? "s" : ""}` }); setChips([]); setMailTo(null); }}>Envoyer</Button></>}>
         {mailTo && <div className="flex flex-col gap-4">
-          <Field label="Destinataires"><div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-strong p-2">{chips.map((c) => <Badge key={c} tone="neutral">{c}<button type="button" aria-label={`Retirer ${c}`} onClick={() => setChips(chips.filter((x) => x !== c))}><X className="ms-1 size-3" /></button></Badge>)}<input value={chip} onChange={(e) => setChip(e.target.value)} onKeyDown={(e) => { if ((e.key === "Enter" || e.key === ",") && /.+@.+/.test(chip)) { e.preventDefault(); setChips([...chips, chip.trim()]); setChip(""); } }} placeholder="adresse@exemple.com puis Entrée" className="min-w-[12em] flex-1 bg-transparent px-1 text-sm outline-none" /></div></Field>
+          <Field label="Destinataires"><div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-strong p-2">{chips.map((c) => <Badge key={c} tone="neutral">{c}<button type="button" aria-label={`Retirer ${c}`} onClick={() => setChips(chips.filter((x) => x !== c))}><X className="ms-1 size-3" /></button></Badge>)}<input value={chip} onChange={(e) => setChip(e.target.value)} onKeyDown={(e) => { if ((e.key === "Enter" || e.key === ",") && /.+@.+/.test(chip)) { e.preventDefault(); setChips([...chips, chip.trim()]); setChip(""); } }} placeholder="Ajouter une adresse puis Entrée" className="min-w-[12em] flex-1 bg-transparent px-1 text-sm outline-none" /></div></Field>
           <TextInput label="Objet" value={s.templates.find((t) => t.id === "t-client")!.subject.replace("{{mission}}", s.missions.find((m) => m.id === mailTo.missionId)?.name ?? "")} onChange={() => {}} disabled />
-          <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-text-secondary">Bonjour, nous serions heureux de recueillir votre retour. {link(mailTo)}</p>
+          <p className="rounded-lg border border-border bg-canvas p-3 text-sm text-text-secondary">Bonjour {mailTo.clientName.split(" ")[0]}, nous serions heureux de recueillir votre retour. {link(mailTo)}</p>
         </div>}
       </Modal>
-      <Drawer open={!!dl} onClose={() => setDrawer(null)} title="Réponses" subtitle={dl?.title} width="36em" footer={<><span className="text-sm text-text-muted">{dl ? responsesOf(dl).length : 0} réponse(s)</span><Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "Export CSV prêt" })}>Exporter en CSV</Button></>}>
-        {dl && (responsesOf(dl).length === 0 ? <EmptyState icon={Link2} title="Aucune réponse pour l’instant" className="py-10" /> : (
-          <ul className="flex flex-col gap-3">
-            {responsesOf(dl).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((r) => (
-              <li key={r.id} className="rounded-lg border border-border p-4"><div className="flex items-center justify-between"><p className="text-base font-medium text-ink">{r.clientName ?? "Client anonyme"}{r.company && <span className="font-normal text-text-muted"> · {r.company}</span>}</p><span className="text-xs text-text-muted">{fmtDate(r.createdAt)}</span></div>{r.rating && <p className="mt-1 text-sm tabular-nums text-text-secondary">Satisfaction : {r.rating} / 5</p>}<p className="mt-2 text-sm text-text-secondary text-pretty">{Object.entries(r.answers).filter(([k]) => k === "qc-4" || k.startsWith("qx")).map(([, v]) => v).join(" ") || "—"}</p></li>
-            ))}
-          </ul>
-        ))}
+      <Drawer open={!!dl} onClose={() => setDrawer(null)} title={dl ? dl.clientName : ""} subtitle={dl ? `${dl.company} · ${s.missions.find((m) => m.id === dl.missionId)?.name}` : ""} width="36em" footer={<><span className="text-sm text-text-muted">{dl ? dl.clientEmail : ""}</span>{dl && responseOf(dl) && <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "Export CSV prêt" })}>Exporter en CSV</Button>}</>}>
+        {dl && (() => {
+          const r = responseOf(dl);
+          return r ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between"><Badge tone="success" dot>A répondu</Badge><span className="text-xs text-text-muted">{fmtDate(r.createdAt)}</span></div>
+              {r.rating && <p className="text-base text-text">Satisfaction : <b className="tabular-nums">{r.rating} / 5</b></p>}
+              <ul className="flex flex-col gap-3">{Object.entries(r.answers).filter(([, v]) => v && v.trim() && !/^\d$/.test(v)).map(([k, v]) => <li key={k} className="rounded-lg border border-border p-3"><p className="text-xs font-semibold text-text-muted">{CLIENT_QUESTIONS.find((x) => x.id === k)?.text ?? "Question personnalisée"}</p><p className="mt-1 text-base text-text text-pretty">{v}</p></li>)}</ul>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <Callout tone="info" title="Aucune réponse pour l’instant">Lien {clientLinkValidity(dl, s.clientResponses, s.now) === "OK" ? `valable jusqu’au ${fmtDate(dl.expiresAt)}` : "expiré ou désactivé"}.</Callout>
+              <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => { act((d) => remindClient(d, me.id, dl.id)); toast({ title: `Relance envoyée à ${dl.clientName}` }); }}>Relancer le client</Button><Button size="sm" variant="secondary" onClick={() => openMail(dl)}>Renvoyer le lien</Button></div>
+            </div>
+          );
+        })()}
       </Drawer>
     </Guard>
   );
 }
-export const _x = { QrIcon };

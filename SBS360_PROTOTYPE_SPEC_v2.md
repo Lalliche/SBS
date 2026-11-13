@@ -1,4 +1,6 @@
-# SBS 360° — Prototype Specification v2 (Mission Feedback)
+# SBS 360° — Prototype Specification v2.1 (Mission Feedback)
+
+> **v2.1 — aligned with the CDC of 12 Nov 2026 (`Proposition SBS - Contrat.pdf`, `CDC_SBS360_officiel.md`).** The changes versus v2 are listed in section 1.1 and applied inline. Where this file and the CDC disagree, the CDC wins.
 
 > **Audience:** Google AI Studio (code-generation model). **Author:** SOL R US. **Goal:** build a client-ready, believable preview of the final product.
 > **UI language:** French (every visible string). **Code, comments, identifiers:** English.
@@ -43,6 +45,20 @@ SBS 360° collects **feedback on people's contribution to a mission**, all year 
 | — | **Client feedback by public link** (optional module) |
 | AI evaluator, AI quality flags | **AI drafts strengths/development areas**, switchable; team leader validates |
 
+### 1.1 Changes introduced by the CDC of 12 Nov 2026
+
+| Topic | v2 | **v2.1 (current)** |
+|---|---|---|
+| Who manages missions | Admin RH (all missions) | **Responsables (d'équipe / de mission) create and manage missions. Admin RH does not manage missions** (he/she only participates like any collaborateur). |
+| Mission fields | name, description, dates, lead, participants | + **numéro OTP** and **durée / nombre d'heures** |
+| Client feedback links | Created by Admin RH, one link per mission, optional identification | **Created and sent by the mission lead or the collaborateur concerned. ONE LINK PER CLIENT** (nom, entreprise, e-mail captured at creation), one link = one client + one mission, never reusable. The platform always knows which client received which link and who answered. No identification form for the client. Client reminder (relance). |
+| Objectives | minimum feedbacks received | minimum feedbacks **given and received** (values set by SBS) + **mandatory feedback for some profiles** (e.g. juniors), configurable |
+| Anonymous feedback & relation | Q10 default ON | CDC 3.8: relation of the giver shown **except on anonymous feedback** → Q10 default **OFF** (still a toggle) |
+| AI assistant | In scope, switchable | **Optional, not included (sur devis).** In the delivered platform the strengths and development areas are **written by the team leader**. Default `aiMode = MANUEL`; the AI screens remain as a clearly labelled "Option sur devis" preview. |
+| Feedback request | nominative | nominative **and also received by e-mail** by the recipient |
+| Per-mission view | — | "**Mes missions, mes feedbacks**": per mission, the feedback I received |
+| Out of scope (sur devis, never built) | PDI, org chart | AI assistant, SAP, voice answer for client link, SMS reminders, intranet link, integration with the annual-evaluation tool, development plan. Self-evaluation / weights / global score: excluded by principle. |
+
 ---
 
 ## 2. Product model
@@ -52,9 +68,9 @@ SBS 360° collects **feedback on people's contribution to a mission**, all year 
 | Term | Meaning |
 |---|---|
 | **Collaborateur** | Any employee. |
-| **Responsable d'équipe** | Employee who does the annual evaluation of his/her team members. |
+| **Responsable d'équipe / de mission** | Employee who does the annual evaluation of his/her team members, creates and manages missions and sends client links. |
 | **Cycle** | Yearly period (named by HR). Archived automatically at its end. |
-| **Mission** | Shared piece of work with a name, dates, participants and a lead. |
+| **Mission** | Shared piece of work with a name, **numéro OTP**, dates / **hours**, participants and a lead (responsable de mission). Managed by responsables, not by HR. |
 | **Feedback** | Written feedback from one person to another about their contribution to a mission. |
 | **Demande** | A feedback request sent by an employee to people he/she worked with. |
 | **Nominatif / Anonyme** | Author known / author not stored anywhere. |
@@ -62,7 +78,7 @@ SBS 360° collects **feedback on people's contribution to a mission**, all year 
 | **Compétence** | One of six: Inspirer · Développer · Intégrité et inclusion · Expertise et outils · Engagements et livraison · Orientation client. |
 | **Note** | Optional 1–5, shown as a supporting summary. |
 | **Synthèse** | End-of-cycle document per employee. |
-| **Feedback client** | Answer from a client via a public link, about a mission. |
+| **Feedback client** | Answer from one identified client via his/her own public link, about a mission. |
 
 ### 2.2 Roles and navigation
 
@@ -74,13 +90,12 @@ Roles: `COLLABORATEUR`, `RESPONSABLE` (also a collaborateur), `ADMIN_RH`, `ADMIN
 | | **Donner un feedback** (primary button in top bar + sidebar) | ✅ | ✅ | ✅ | — |
 | | Mes demandes (badge = to answer) | ✅ | ✅ | ✅ | — |
 | | Mes feedbacks (Reçus / Envoyés) | ✅ | ✅ | ✅ | — |
-| | Mes missions | ✅ | ✅ | ✅ | — |
+| | Mes missions | ✅ | ✅ | ✅ (participation only) | — |
+| | **Retours client** (links I created / on my missions) | ✅ | ✅ | — | — |
 | **Mon équipe** | Suivi de l'équipe | — | ✅ | — | — |
 | | Synthèses (badge = to write) | — | ✅ | — | — |
 | **Pilotage RH** | Cycles | — | — | ✅ | — |
-| | Missions (all) | — | — | ✅ | — |
-| | Suivi & rappels | — | — | ✅ | — |
-| | Feedback client (links) | — | — | ✅ | — |
+| | Suivi & rappels (incl. feedbacks non réalisés) | — | — | ✅ | — |
 | **Référentiels** | Collaborateurs | — | 👁 team | ✅ | 👁 read |
 | | Compétences & questions | — | — | ✅ | — |
 | **Administration** | Messages (templates, notifications) | — | — | ✅ | — |
@@ -102,9 +117,10 @@ Roles: `COLLABORATEUR`, `RESPONSABLE` (also a collaborateur), `ADMIN_RH`, `ADMIN
 | Collaborateur sees feedback from clients on his/her mission (Q7) | OFF |
 | Mission participants see all client feedback of the mission (Q8) | OFF |
 | A requested feedback may be anonymous (Q9) | ON |
-| Giver's relation is shown on anonymous feedback (Q10) | ON |
+| Giver's relation is shown on anonymous feedback (Q10) — CDC 3.8 says *except anonymous* | **OFF** |
 | Admin RH may hide an inappropriate anonymous text (Q11) | ON |
 | Anonymous feedback counts in quotas (Q12) | ON |
+| Any collaborateur may create a mission (Q13) — HR never does | OFF |
 | Collaborateur sees average per competency (Q22) | ON |
 | PDF of the synthesis can be given to the collaborateur (Q35) | ON |
 
@@ -136,9 +152,9 @@ The product UI never mentions "démo" except a discreet `Version de démonstrati
 
 | Status | Items |
 |---|---|
-| **In the prototype** | Cycles (automatic archiving), missions, requested and spontaneous feedback, named/anonymous choice, six competencies and adapted questions, optional 1–5 ratings, quotas and reminders, team-leader view, synthesis (strengths, development areas, radar, PDF), optional AI drafting, client feedback by public link. |
+| **In the prototype** | Cycles (automatic archiving), missions, requested and spontaneous feedback, named/anonymous choice, six competencies and adapted questions, optional 1–5 ratings, given + received objectives with mandatory feedback for some profiles, reminders, team-leader view, synthesis (strengths and development areas written by the leader, radar, PDF), missions managed by responsables (OTP, hours), client feedback by one public link per client. |
 | **Shown as "à confirmer"** | Detailed access rules (all visibility toggles), exact quota values, development plan with action tracking (not built), multiple leaders per employee. |
-| **Not built** | Self-evaluation, weights, overall score, any link with SBS's existing annual-evaluation tool, org chart, talent matrix. |
+| **Not built / sur devis (CDC 3.11)** | AI assistant (preview only, labelled paid option), SAP, voice answers, SMS reminders, intranet link, integration with the annual-evaluation tool, development plan. Never: self-evaluation, weights, overall score, org chart, talent matrix. |
 
 ---
 
@@ -239,18 +255,18 @@ Overlay anatomy: header (title + subtitle + close ✕) → scrollable body → *
 ### 7.1 Entities (TypeScript; ids are strings)
 
 - `User` { id, matricule, firstName, lastName, email, departmentId, jobTitle, grade, leaderId (single, but model `leaderIds[]` ready for Q41), status, role }
-- `Cycle` { id, name, startDate, endDate, status (`A_VENIR|OUVERT|ARCHIVE`), quotaRule, reminderRules[], aiMode (`OFF|MANUEL|ASSISTE`) }
-- `Mission` { id, cycleId, name, description, startDate, endDate, leadId, status (`EN_COURS|TERMINEE`), participantIds[] }
+- `Cycle` { id, name, startDate, endDate, status (`A_VENIR|OUVERT|ARCHIVE`), quotaRule { minReceived, **minGiven**, minFromDirectReports, teamLeaderNeedsTeamFeedback, **mandatory { enabled, grades[] }** }, reminderRules[], aiMode (`OFF|MANUEL|ASSISTE`; default `MANUEL`, `ASSISTE` = optional paid feature) }
+- `Mission` { id, cycleId, name, **otp**, **hours**, description, startDate, endDate, leadId, status (`EN_COURS|TERMINEE`), participantIds[] }
 - `FeedbackRequest` { id, missionId, requesterId, recipientsIds[], message, dueDate, allowAnonymous } — **per-target status stored on the giver's side only** (`PendingTask` { giverId, requestId, status `EN_ATTENTE|TRAITEE|DECLINEE` }); see 7.2.
 - `Competency` { id, name, description, order }
 - `Question` { id, competencyId, variants: { relation (`RESPONSABLE|PAIR|EQUIPE`) × gradeBand (`JUNIOR|CONFIRME|SENIOR`) → text }, kind (`COLLAB|CLIENT`), order }
 - `NamedFeedback` { id, cycleId, missionId?, authorId, recipientId, relation, requestId?, answers {questionId: text}, ratings {competencyId: 1–5}, createdAt, status (`BROUILLON|ENVOYE`), hiddenByHR? }
 - `AnonymousFeedback` { id, cycleId, missionId?, recipientId, relation (nullable if rule Q10 OFF), answers, ratings, createdAt, hiddenByHR? } — **no author field, no request id, no giver reference, ever.**
 - `Synthesis` { id, cycleId, userId, status (`NON_COMMENCEE|EN_REDACTION|VALIDEE`), strengths {competencyId: text}, axes {competencyId: text}, aiDraft?, validatedAt }
-- `ClientLink` { id, token, missionId, title, welcome, questionIds[], expiresAt, maxResponses, identification (`AUCUNE|FACULTATIVE|OBLIGATOIRE`), status (`ACTIF|EXPIRE|DESACTIVE`) }
-- `ClientResponse` { id, linkId, missionId, clientName?, company?, answers, rating?, createdAt }
+- `ClientLink` { id, token, missionId, **createdById**, **clientName, company, clientEmail** (one client per link), title, welcome, questionIds[], expiresAt, maxResponses (default 1), status (`ACTIF|EXPIRE|DESACTIVE`) } — no `identification` field: the client is always known from the link.
+- `ClientResponse` { id, linkId, missionId, clientName, company (copied from the link), answers, rating?, createdAt }
 - `Notification`, `AdminEvent` { id, ts, actorId, action, target, details } — **admin actions only; never feedback authorship.**
-- `Settings` { brand, visibilityRules, noteMode (`PAR_COMPETENCE|PAR_MISSION`), noteRequired, quotas { minReceived, minFromDirectReports, teamLeaderNeedsTeamFeedback }, countsMode (`RECUS|DONNES`) }
+- `Settings` { brand, visibilityRules, noteMode (`PAR_COMPETENCE|PAR_MISSION`), noteRequired, quotas { minReceived, **minGiven**, minFromDirectReports, teamLeaderNeedsTeamFeedback, **mandatory { enabled, grades[] }** } } (the former `countsMode` switch is removed: both counts are tracked)
 
 ### 7.2 Anonymity architecture (must be implemented as described)
 
@@ -268,13 +284,14 @@ Overlay anatomy: header (title + subtitle + close ✕) → scrollable body → *
 - **30 collaborateurs**, 4 departments (*Strategy & Consulting* 9, *Engineering & Tech* 8, *People & HR* 5, *Finance & Operations* 6) + 2 leaders. Grades are **placeholders** (`Junior`, `Consultant`, `Senior`, `Manager`, `Directeur`), replaced later by SBS's list. Avatars are initials with deterministic pastel colors.
 - **Anchors:** Karim Saci (Managing Partner, Admin tech), Sophie Martin (Directrice du Capital Humain, Admin RH), Thomas Dubois (Partner, team leader of 5), Lucas Bernard (Principal, in Thomas's team), Claire Moreau (Consultante senior, same team, peer).
 - **Cycle:** `FY27`, open, ends in about 7 months. Archived `FY26` with full syntheses and PDFs.
-- **Missions:** 14 in the open cycle (2 finished), each with 3–7 participants.
+- **Missions:** 14 in the open cycle (2 finished), each with 3–7 participants, an OTP number (e.g. `OTP-26-0142`) and a budget in hours. Leads are responsables (or the collaborateur concerned); never Admin RH.
 - **Feedback:** about 160 in the open cycle, 25 % anonymous; every competency covered; ratings present on about 70 %.
 - **Stories to make visible:**
   - *Lucas Bernard:* 9 feedbacks over 4 missions, 2 anonymous. Strong on *Expertise et outils* and *Engagements et livraison*; clear development area on *Inspirer*. Quota ring at 3 of 5 (needs 2 more, 1 from a direct report).
   - *Claire Moreau:* 3 pending requests to answer, one due within 3 days.
   - *Thomas Dubois:* 2 team members below quota; he received one anonymous feedback from his team.
-  - *Mission with a client link:* active link, 3 client responses, one link expired.
+  - *Mission with client links:* mission « Schéma directeur… » has 3 links, one per client: 2 answered, 1 pending (expires in 3 days); another mission has one expired link. Each response shows the client name + company.
+  - *Mandatory feedback:* juniors must give at least `minGiven` feedbacks; those who have not are flagged in *Suivi & rappels*.
   - *Scenario ③:* 22 syntheses: 9 validated, 6 in writing (3 with an AI draft ready), 7 not started.
 - **Question bank (placeholders to be replaced by SBS's):** 7 written questions, one per competency plus one open comment:
   1. *Inspirer* — confiance, énergie positive sous pression, direction claire, progression des autres.
@@ -297,10 +314,10 @@ Overlay anatomy: header (title + subtitle + close ✕) → scrollable body → *
 | **RG-05 Average** | Per competency: sum of ratings given ÷ number of ratings given, per mission or over the whole cycle. No ratings → `null`, displayed "—". |
 | **RG-06 No weights** | No weighting, no overall score anywhere (header, table, PDF, charts). |
 | **Radar** | One point per competency = RG-05. If Q21 is ON, one polygon per relation plus an "Ensemble" polygon; otherwise only "Ensemble". Reference ring at 3. Always offer "Voir en tableau". |
-| **Quota progress** | Per user: `received` (or `given` depending on `countsMode`) vs `minReceived`; `fromDirectReports` count; anonymous counted if Q12. A team leader also needs feedback from team members. Display `3 / 5` with a ring. |
+| **Quota progress** | Per user: `received` vs `minReceived` **and** `given` vs `minGiven`; `fromDirectReports` count (direct circle: leader or direct reports); anonymous counted if Q12. `given` = named feedbacks sent + requests answered (an answered request never reveals whether it was named or anonymous; spontaneous anonymous sends cannot be attributed, by design). A team leader also needs feedback from team members. Ring shows received `3 / 5`; given is shown as a second line. **Mandatory:** if `mandatory.enabled` and the user's grade is in `mandatory.grades`, reaching `minGiven` is required and flagged. |
 | **Reminders** | Rules (e.g. weekly for pending requests, monthly for quota gaps) fire when the demo clock crosses them, creating notifications and history rows. |
 | **Archiving** | When `now > cycle.endDate`: status `ARCHIVE`, read-only everywhere, next cycle becomes `OUVERT` the next day, notification to RH and team leaders. |
-| **Client link validity** | Active only if `status = ACTIF`, `now < expiresAt` and responses `< maxResponses`. Otherwise the public page shows the right message. |
+| **Client link validity** | Active only if `status = ACTIF`, `now < expiresAt` and responses `< maxResponses` (default 1: one link = one client = one answer). Otherwise the public page shows the right message. |
 | **Evolution** | Delta of a competency average against the archived cycle (only if present in both). |
 
 State machines: Cycle `A_VENIR → OUVERT → ARCHIVE`; Mission `EN_COURS → TERMINEE`; Task `EN_ATTENTE → TRAITEE|DECLINEE`; Synthesis `NON_COMMENCEE → EN_REDACTION → VALIDEE`; ClientLink `ACTIF → EXPIRE|DESACTIVE`.
@@ -326,13 +343,13 @@ Hero with product name, one-sentence value proposition, two CTAs, a polished sta
 Greeting, contextual subtitle, cycle banner.
 
 **Collaborateur:**
-- **"Vos tâches"** checklist card: *N demandes de feedback à traiter* (with due dates) · *Votre objectif : 3 / 5 feedbacks reçus* (ring + hint "1 de vos collaborateurs directs") · *Missions terminées sans feedback demandé*. Each row has a button (**[Répondre]**, **[Demander]**).
+- **"Vos tâches"** checklist card: *N demandes de feedback à traiter* (with due dates) · *Votre objectif : 3 / 5 feedbacks reçus* (ring + hint "1 de vos collaborateurs directs") · *Feedbacks donnés : x / minGiven* (flagged **Obligatoire** for the profiles concerned) · *Missions terminées sans feedback demandé*. Each row has a button (**[Répondre]**, **[Demander]**).
 - Big card **"Donner un feedback"** with **[Donner un feedback]** and **[Demander un feedback]**.
 - "Mes missions récentes" (cards), "Derniers feedbacks reçus" (if allowed).
 
-**Responsable d'équipe:** the above plus *Mon équipe* (avatar list with quota rings, **[Relancer]**), *Synthèses à rédiger* with deadline, "Feedbacks récents sur mon équipe".
+**Responsable d'équipe / de mission:** the above plus *Mon équipe* (avatar list with quota rings, **[Relancer]**), *Synthèses à rédiger* with deadline, "Feedbacks récents sur mon équipe", **[Nouvelle mission]** and a *Retours client* shortcut.
 
-**Admin RH:** KPI row (clickable): *Feedbacks du cycle* · *Participation* (% employees who gave at least one) · *Objectifs atteints* · *Synthèses validées*. Charts: feedbacks over time (named vs anonymous), participation by department. "Points d'attention" list with inline actions (e.g. "6 collaborateurs sous l'objectif" **[Relancer]**, "1 lien client expire dans 3 jours" **[Prolonger]**). Quick actions: **[Créer une mission]**, **[Créer un lien client]**, **[Ouvrir Suivi & rappels]**.
+**Admin RH:** KPI row (clickable): *Feedbacks du cycle* · *Participation* (% employees who gave at least one) · *Objectifs atteints* · *Synthèses validées*. Charts: feedbacks over time (named vs anonymous), participation by department. "Points d'attention" list with inline actions (e.g. "6 collaborateurs sous l'objectif" **[Relancer]**, "N demandes sans réponse" **[Relancer]**, "N retours obligatoires non réalisés" **[Suivre]**). Quick actions: **[Ouvrir Suivi & rappels]**, **[Gérer les collaborateurs]**, **[Règles de visibilité]**. Admin RH has no mission or client-link action (CDC 3.1).
 
 **Admin technique:** users, last backup, recent technical events; **[Créer une sauvegarde]**, **[Gérer les utilisateurs]**.
 
@@ -357,20 +374,23 @@ Greeting, contextual subtitle, cycle banner.
 - *Reçus* (if allowed): grouped by mission; filters mission, competency, relation, period, type. Feedback card: giver (name or "Anonyme"), relation chip, date, answers per question, ratings. Empty state if the visibility rule is OFF: "Vos feedbacks seront consultables lors de la publication de votre synthèse."
 - *Envoyés*: named feedback only, read-only, with note "Les feedbacks anonymes ne sont pas listés : personne, pas même vous, ne peut les retrouver."
 
+The request is **nominative** (the recipient sees who asks) and **also reaches the recipient by e-mail** (notification + one row in *Messages › Historique*; toast says so).
+
 **Overlay "Demander un feedback" (drawer 560 px):** Mission (required), People picker multi (participants of the mission pre-suggested, with relation chips and workload hint "a déjà 3 demandes en attente"), Message (optional), Due date, switch *Autoriser les réponses anonymes* (if rule Q9 ON). Footer **[Annuler]**, **[Envoyer N demandes]**.
 
 ### 9.5 Missions
 
-**List (collaborateur: own; RH: all):** header "Missions", **[Nouvelle mission]** (RH, or all if Q13 ON), tabs *En cours · Terminées*, search, table: Mission · Responsable de mission · Participants (avatar stack) · Dates · Feedbacks (count) · Statut · ⋯.
+**List (everyone sees the missions they lead or take part in; Admin RH sees only his/her own participations):** header "Mes missions", **[Nouvelle mission]** (**responsables**, or everyone if Q13 ON — never driven by HR), tabs *En cours · Terminées*, search, table: Mission · **OTP** · Responsable de mission · Participants (avatar stack) · Dates · **Heures** · Feedbacks (count) · Statut · ⋯.
 
 **Mission page** (tabs):
-- *Aperçu*: description, dates, lead, KPIs (feedbacks, demandes en attente), activity timeline.
+- *Aperçu*: description, **OTP, dates and hours**, lead, KPIs (feedbacks, demandes en attente), activity timeline.
+- ***Mes feedbacks*** (participants): the feedback I received on this mission — the "Mes missions, mes feedbacks" view (CDC 3.9).
 - *Participants*: table with each participant and **"Évaluateurs suggérés"** chips (lead, peers, team) with **[+]**; **[Suggérer automatiquement]** (preview of suggestions then **[Appliquer]**); **[Ajouter un participant]** (picker); per-row **[Demander un feedback]**.
 - *Feedbacks*: counts per participant (not content), filters. Content opens only through the person's page according to rules.
-- *Feedback client* (RH and lead): link status, responses count, **[Créer un lien]**, **[Voir les réponses]**.
+- *Feedback client* (lead and participants concerned): one row per client link (client, status, answered or not), **[Créer un lien]**, **[Voir les réponses]**, **[Relancer le client]**.
 - *Paramètres*: edit fields; **[Marquer comme terminée]** (modal: "Les feedbacks restent possibles jusqu'à la fin du cycle." + confirm).
 
-**Overlay "Nouvelle mission" (drawer):** Nom*, Description, Dates*, Responsable de mission* (picker), Participants* (multi picker with department filter and "tout un département"), **[Créer la mission]**, **[Créer et demander des feedbacks]**.
+**Overlay "Nouvelle mission" (drawer):** Nom*, **Numéro OTP***, **Durée / nombre d'heures**, Description, Dates*, Responsable de mission* (picker), Participants* (multi picker with department filter and "tout un département"), **[Créer la mission]**, **[Créer et demander des feedbacks]**.
 
 ### 9.6 Suivi de l'équipe (Responsable d'équipe)
 
@@ -386,7 +406,7 @@ Row opens **Page collaborateur** (tabs):
 
 List of cycles with status pill, dates, KPIs. **[Nouveau cycle]** (drawer: nom, dates début/fin; warning if overlapping). **Cycle page** tabs:
 - *Aperçu*: progress through the year (timeline with today marker), KPIs, archive countdown.
-- *Objectifs & rappels*: quota editor (minimum de feedbacks reçus, dont de collaborateurs directs, retours de l'équipe pour un responsable; switch *Reçus / Donnés*; switch *Les feedbacks anonymes comptent*), reminder rules builder (add rule: weekly pending requests, monthly quota gaps, 30 days before end), live preview "Concerne 11 collaborateurs".
+- *Objectifs & rappels*: quota editor (minimum de feedbacks **reçus**, minimum de feedbacks **donnés**, dont de collaborateurs directs, retours de l'équipe pour un responsable; switch *Les feedbacks anonymes comptent*; **rule "Retour obligatoire"**: switch + grades concerned, default *Junior*), reminder rules builder (add rule: weekly pending requests, monthly quota gaps, 30 days before end), live preview "Concerne 11 collaborateurs".
 - *Synthèses*: table of syntheses status per person; **[Relancer les responsables]**.
 - *Archivage*: explains automatic archiving; shows what will happen on the end date; **[Prévisualiser l'archivage]** (modal listing consequences). No manual archive button (only via time travel in the demo bar).
 - *Archives*: list of archived cycles, **[Ouvrir]** → read-only mode with amber banner; every action hidden; PDF available.
@@ -407,7 +427,7 @@ Tabs *Compétences · Banque de questions · Questions client*.
 - *Left:* **Radar** of the six competencies (RG-05; relation polygons if Q21; hover tooltip; "Voir en tableau"), under it the **competency table** (Compétence · Moyenne · Nb de notes · Nb de feedbacks · Évolution vs cycle archivé). No total row.
 - *Right:* **"Points forts"** and **"Axes de développement"** lists. Each item is editable inline, tagged by competency, with **[Ajouter]**, drag to reorder, **[Supprimer]** (undo toast).
 - *Below:* **Verbatims** grouped by competency, each with relation chip and nominatif/anonyme badge (names only if rules allow); filter by mission.
-- **AI panel (when enabled):** button **[Proposer avec l'IA]** (in mode *Assisté*) opens a right panel: for each competency a short summary and suggested strength or axis, each with **[Utiliser]**, **[Modifier]**, **[Ignorer]**. Label "Généré par IA — à vérifier", sources line "basé sur 11 réponses écrites, 7 missions". Nothing enters the synthesis without the leader's action. Feedback buttons **[Utile] / [Pas utile]**. In mode *Responsable seul* the panel is absent.
+- **AI panel — OPTIONAL, NOT INCLUDED (sur devis, CDC 3.11).** In the delivered platform the leader writes strengths and development areas by hand; the panel is hidden by default (`aiMode = MANUEL`). When an Admin RH switches the preview on (*Paramètres › Intelligence artificielle*, labelled "Option sur devis"), button **[Proposer avec l'IA]** (in mode *Assisté*) opens a right panel: for each competency a short summary and suggested strength or axis, each with **[Utiliser]**, **[Modifier]**, **[Ignorer]**. Label "Généré par IA — à vérifier", sources line "basé sur 11 réponses écrites, 7 missions". Nothing enters the synthesis without the leader's action. Feedback buttons **[Utile] / [Pas utile]**. In mode *Responsable seul* the panel is absent.
 - **Overlay "Valider la synthèse" (modal):** checklist (points forts rédigés, axes rédigés, aucune suggestion IA non traitée), notice "La synthèse deviendra visible par {Nom}" (if Q34 ON) and **[Valider]**; after validation fields lock, with **[Rouvrir]** for the leader.
 - **Overlay "Exporter en PDF":** options (checkboxes: Radar, Tableau des moyennes, Points forts et axes, Réponses écrites), live **A4 preview** of page 1, **[Télécharger le PDF]** (simulated progress + download) and **[Imprimer]** (print stylesheet).
 
@@ -415,7 +435,7 @@ Tabs *Compétences · Banque de questions · Questions client*.
 
 Header "Suivi & rappels". Tabs:
 - *Participation*: bars by department and grade; line chart of feedbacks over the cycle (named vs anonymous); filters.
-- *Objectifs*: table of all collaborateurs with ring, received, from direct reports, status (*Atteint · En bonne voie · En retard*); saved views *En retard · Responsables · Par département*; bulk **[Relancer]**.
+- *Objectifs*: table of all collaborateurs with ring, received, **given**, from direct reports, status (*Atteint · En bonne voie · En retard*); saved views *En retard · **Retour obligatoire non réalisé** · Responsables · Par département*; bulk **[Relancer]**. This is also where HR follows the **feedback requests left unanswered** (with **[Relancer]**).
 - *Rappels*: rules list with on/off switches, next run, history table (date, rule, recipients, sent/read). **[Envoyer un rappel maintenant]** (modal: audience, template select, recipients count, preview, **[Envoyer N rappels]**).
 
 ### 9.11 Collaborateurs (annuaire)
@@ -429,19 +449,19 @@ Table (Collaborateur · Département · Poste · Grade · Responsable · Statut 
 | **Désactiver** | Modal showing impact (missions, team members to reassign) — history is kept; **[Réactiver]** appears afterwards. |
 | **Responsable multiple** | A switch "Autoriser plusieurs responsables" in Settings (Q41) shows a second leader field. |
 
-### 9.12 Feedback client
+### 9.12 Feedback client (CDC 3.7 — one link per client)
 
-**Admin RH page "Feedback client":** table of links (Mission · Titre · Statut · Réponses X / max · Expiration · ⋯). Row menu: **Voir les réponses**, **Copier le lien**, **Prolonger**, **Désactiver/Réactiver**, **Dupliquer**.
+**Page "Retours client"** (collaborateur and responsable; **not Admin RH**): table of the client links I created or that concern the missions I lead / take part in (Client · Entreprise · Mission · Statut (*Actif, Répondu, Expiré, Désactivé*) · Expiration · ⋯). Row menu: **Voir la réponse**, **Copier le lien**, **Envoyer par e-mail**, **Relancer le client**, **Prolonger**, **Désactiver/Réactiver**, **Dupliquer pour un autre client** (creates a *new* link for a *new* client).
 
 **Wizard "Créer un lien" (3 steps, full-screen):**
-1. *Mission et titre*: mission picker, title shown to the client, welcome message (rich text short).
-2. *Questions*: choose from *Questions client*, reorder, add a custom question; live phone preview on the right.
-3. *Paramètres*: expiration date, maximum responses, identification (*Aucune · Facultative · Obligatoire*), anti-abuse notice (read-only), switch *Activer le lien*.
-**Success overlay:** big link field with **[Copier le lien]**, QR code with **[Télécharger le QR]**, **[Envoyer par e-mail]** (small composer with recipient chips, subject, message and link), **[Prévisualiser comme client]**.
+1. *Mission et client*: mission picker (missions I lead or take part in), **client name\*, entreprise\*, e-mail\***, title shown to the client, welcome message.
+2. *Questions*: choose from *Questions client*, reorder, add a custom question; live phone preview.
+3. *Paramètres*: expiration date, maximum responses (default **1**), anti-abuse notice (read-only), switch *Activer le lien*. (No "identification" setting: the client is already known.)
+**Success overlay:** link field with **[Copier le lien]**, QR code with **[Télécharger le QR]**, **[Envoyer par e-mail]** (composer prefilled with the client's address, subject, message and link), **[Prévisualiser comme client]**. The sender sends the link himself/herself.
 
-**Drawer "Réponses":** list (date, client name/company if given, rating if any), click shows answers; **[Exporter en CSV]**. Visibility per rules (Q7, Q8).
+**Drawer "Réponse":** the client name and company, the mission, the answers and rating; **[Exporter en CSV]**. Visible to the creator and the mission lead; to other participants only per rules Q7 / Q8.
 
-**Public client page (route `/c/:token`, outside the app shell, mobile-first):** SBS logo and colors, title, welcome message, optional identification block, questions (textarea, optional 1–5 stars), **[Envoyer mes réponses]**, then a confirmation screen "Merci pour votre retour." States: *Lien expiré*, *Lien désactivé*, *Nombre maximal de réponses atteint*, *Réponse déjà envoyée* (device-level soft limit). No account, no navigation to the app.
+**Public client page (route `/c/:token`, outside the app shell, mobile-first):** SBS logo and colors, "Bonjour {client}", title, welcome message, questions (textarea, optional 1–5 stars), **[Envoyer mes réponses]**, then a confirmation screen "Merci pour votre retour." **No identification form** (the link already identifies the client). States: *Lien expiré*, *Lien désactivé*, *Réponse déjà reçue pour ce lien*, *Lien introuvable*. No account, no navigation to the app.
 
 ### 9.13 Messages (Admin RH)
 
@@ -462,7 +482,7 @@ Left sub-navigation, sticky save bar ("Annuler / Enregistrer les modifications")
 2. **Règles de visibilité** (RH): matrix from 2.3 (rows = rules, switches, locked cells with lock + tooltip, e.g. "Auteur d'un feedback anonyme : jamais visible"), inline impact sentence on change, **[Voir en tant que…]** split preview.
 3. **Notes** (RH): *par compétence / par mission*, *note obligatoire*, *radar par relation*.
 4. **Anonymat** (RH): read-only explanation card + diagram link; toggles for relation shown (Q10), RH moderation (Q11), anonymous counts in quotas (Q12). The "never identifiable" line is locked.
-5. **Intelligence artificielle** (RH): master switch; mode segmented control *Rédaction par le responsable seul · Rédaction assistée par l'IA*; policy text "L'IA ne modifie jamais une note et ne publie rien sans validation."
+5. **Intelligence artificielle** (RH) — badge **"Option sur devis · non incluse"**: callout "Dans la plateforme livrée, les points forts et axes sont rédigés par le responsable."; preview switch (off by default); mode segmented control *Rédaction par le responsable seul · Rédaction assistée par l'IA*; policy text "L'IA ne modifie jamais une note et ne publie rien sans validation."
 6. **Utilisateurs & rôles** (Admin tech): table with role, last login, status; **[Attribuer un rôle]** modal; at least one Admin RH must remain.
 7. **Messagerie** (Admin tech): sender, status card with **[Tester la connexion]** (simulated).
 8. **Données & sauvegarde** (Admin tech): **[Créer une sauvegarde]**, list with **[Télécharger]**, **[Restaurer]** (severe modal, type "RESTAURER"), retention period.
@@ -493,8 +513,9 @@ Avatar color, read-only identity, notification preferences (switches), **[Enregi
 **A. Collaborateur (Lucas), 2 min:** Accueil → quota ring 3/5 → **[Demander un feedback]** (mission, 4 people) → switch to Claire → answers a request anonymously → back to Lucas: "1 réponse sur 4", still no name.
 **B. Donner un feedback (Claire), 90 s:** top-bar **[Donner un feedback]** → pick Lucas → choose *Anonyme* and show "Ce que verra le destinataire" → write answers → optional ratings → send. Open *Mes feedbacks › Envoyés*: not listed, explanation shown.
 **C. Preuve d'anonymat, 45 s:** as Admin RH open Journal (no author), Paramètres › Anonymat, and *Aide › Comment fonctionne l'anonymat*.
-**D. Responsable (Thomas), 2 min:** Suivi de l'équipe → Lucas → Feedbacks (filters) → scenario ③ → Synthèse → radar, **[Proposer avec l'IA]**, accept one suggestion, edit one, write one → **[Valider la synthèse]** → **[Exporter en PDF]**.
-**E. Admin RH, 3 min:** Accueil KPIs → Missions › Nouvelle mission → Feedback client › Créer un lien (wizard) → demo bar **[Ouvrir le lien client]** → answer as a client → response appears in the drawer → Paramètres › Règles de visibilité: switch a rule and use **[Voir en tant que…]** → Cycle › Archivage → demo bar "jusqu'à la fin du cycle" → cycle archived, new cycle open.
+**D. Responsable (Thomas), 2 min:** Suivi de l'équipe → Lucas → Feedbacks (filters) → scenario ③ → Synthèse → radar, write one strength and one development area by hand, edit one → **[Valider la synthèse]** → **[Exporter en PDF]**. (Optional: in *Paramètres* switch the "Option sur devis" AI preview on to show the draft panel, clearly labelled as a paid option.)
+**E. Responsable de mission (Thomas), 2 min:** *Mes missions* → **[Nouvelle mission]** (nom, **numéro OTP**, heures, participants) → *Retours client* → **[Créer un lien]** for a named client (nom, entreprise, e-mail) → demo bar **[Ouvrir le lien client]** → answer as that client → the response appears with the client name and the mission → **[Relancer le client]** on a pending link.
+**E2. Admin RH (Sophie), 2 min:** Accueil KPIs → Suivi & rappels (demandes sans réponse, retour obligatoire non réalisé, **[Relancer]**) → Collaborateurs → Paramètres › Règles de visibilité: switch a rule and use **[Voir en tant que…]** → Cycle › Archivage → demo bar "jusqu'à la fin du cycle" → cycle archived, new cycle open. (Sophie has no mission nor client-link screen.)
 **F. Admin technique (Karim), 45 s:** Utilisateurs & rôles, sauvegarde, restauration (annuler).
 
 ---

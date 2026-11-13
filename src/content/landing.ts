@@ -39,7 +39,7 @@ export const hero = {
     note: "Aucune note finale calculée.",
   },
   chips: [
-    { id: "anon", label: "Feedback anonyme", sub: "Pair · Cartographie des risques" },
+    { id: "anon", label: "Feedback anonyme", sub: "Cartographie des risques" },
     { id: "named", label: "Nominatif", sub: "Responsable · Schéma directeur" },
     { id: "quota", label: "Objectif", sub: "3 / 5 feedbacks reçus" },
   ],
@@ -51,13 +51,13 @@ export const cycle = {
   title: "Une année claire, sans manipulation.",
   lead: "Du lancement à l’archivage, la plateforme suit le rythme de l’année et garde l’historique.",
   steps: [
-    { n: "01", title: "Ouvrir le cycle", text: "L’administrateur RH ouvre l’année : dates de début et de fin, objectifs de feedback, règles de rappel." },
-    { n: "02", title: "Échanger des feedbacks", text: "Chacun demande ou donne un feedback, avec son nom ou de façon anonyme, rattaché à une mission." },
+    { n: "01", title: "Ouvrir le cycle", text: "L’administrateur RH ouvre l’année : dates de début et de fin, objectifs de feedback donnés et reçus, règles de rappel." },
+    { n: "02", title: "Échanger des feedbacks", text: "Les responsables créent les missions. Chacun demande ou donne un feedback, avec son nom ou de façon anonyme, rattaché à une mission." },
     { n: "03", title: "Synthétiser", text: "Points forts, axes de développement et radar sur six compétences. Des moyennes simples, jamais de score global." },
     { n: "04", title: "Archiver", text: "À la date de fin, le cycle s’archive automatiquement. Le suivant démarre, l’historique reste consultable." },
   ],
   visual: {
-    open: { title: "Cycle FY27", range: "1 juil. 2026 → 30 juin 2027", today: "Aujourd’hui", items: ["Objectifs : 5 feedbacks reçus", "Rappels hebdomadaires actifs", "14 missions"] },
+    open: { title: "Cycle FY27", range: "1 juil. 2026 → 30 juin 2027", today: "Aujourd’hui", items: ["Objectifs : 5 feedbacks reçus, 3 donnés", "Retour obligatoire pour les profils juniors", "Rappels hebdomadaires actifs"] },
     exchange: { question: "Engagements et livraison", prompt: "Comment cette personne a-t-elle tenu ses engagements en matière de délais, de budget et de qualité ?", answer: "Tous les jalons tenus, budget respecté. Anticipe les risques et alerte tôt, avec une solution proposée.", named: "Avec mon nom", anonymous: "Anonyme", send: "Envoyer le feedback" },
     synth: { title: "Synthèse", strengths: "Points forts", axes: "Axes de développement", s1: "Structure les problèmes complexes avec clarté.", a1: "Clarifier plus tôt la direction donnée à l’équipe." },
     archive: { cycles: [{ n: "FY28", s: "Ouvert" }, { n: "FY27", s: "Archivé" }, { n: "FY26", s: "Archivé" }] },
@@ -92,8 +92,8 @@ export const profiles = {
   enter: "Entrer en tant que",
   tech: "Administrateur technique",
   cards: [
-    { userId: "u-sophie", name: "Sophie Martin", job: "Directrice du Capital Humain", role: "Admin RH", caps: ["Ouvre les cycles et pilote la participation", "Crée les missions et les liens client", "Règle la visibilité et les rappels"] },
-    { userId: "u-thomas", name: "Thomas Dubois", job: "Partner", role: "Responsable d’équipe", caps: ["Suit les feedbacks de son équipe", "Rédige la synthèse de chaque collaborateur", "S’appuie sur une proposition IA, à valider"] },
+    { userId: "u-sophie", name: "Sophie Martin", job: "Directrice du Capital Humain", role: "Admin RH", caps: ["Ouvre les cycles et fixe les objectifs", "Gère les comptes et suit les feedbacks non réalisés", "Règle la visibilité et les rappels"] },
+    { userId: "u-thomas", name: "Thomas Dubois", job: "Partner", role: "Responsable d’équipe / de mission", caps: ["Crée et gère ses missions, envoie les liens clients", "Suit les feedbacks de son équipe", "Rédige la synthèse de chaque collaborateur"] },
     { userId: "u-lucas", name: "Lucas Bernard", job: "Principal", role: "Collaborateur", caps: ["Demande un feedback après une mission", "Suit son objectif de feedbacks reçus", "Consulte ses feedbacks et sa synthèse"] },
     { userId: "u-claire", name: "Claire Moreau", job: "Consultante senior", role: "Collaboratrice qui donne des feedbacks", caps: ["Répond aux demandes de ses collègues", "Choisit : avec son nom ou anonyme", "Retrouve ses envois nominatifs"] },
   ],
@@ -110,8 +110,8 @@ export const competencies = {
 export const clientFeedback = {
   eyebrow: "Retour client",
   title: "Le point de vue du client, par un simple lien.",
-  lead: "L’administrateur RH crée un lien rattaché à une mission. Le client répond depuis son téléphone, sans créer de compte. Partage par e-mail ou par QR code.",
-  points: ["Date d’expiration et nombre de réponses maximal", "Activation et désactivation à tout moment", "Réponses rattachées à la mission"],
+  lead: "Le responsable de mission crée un lien pour un client précis et l’envoie lui-même, par e-mail ou par QR code. Le client répond depuis son téléphone, sans créer de compte.",
+  points: ["Un lien par client : on sait toujours qui a répondu", "Expiration, activation et désactivation à tout moment, relance du client", "Réponses rattachées à la mission, avec le nom du client"],
   phone: { title: "Votre avis sur notre accompagnement", welcome: "Merci de prendre quelques minutes pour partager votre retour.", q: "Comment jugez-vous la qualité des livrables remis ?", send: "Envoyer mes réponses" },
 };
 
@@ -142,6 +142,7 @@ export const faq = {
   items: [
     { q: "Qu’est-ce qu’un feedback anonyme ?", a: "Un feedback dont l’auteur n’est enregistré nulle part. Il est stocké dans un espace séparé, sans lien avec la personne qui l’a écrit. Une fois envoyé, il ne peut plus être modifié ni retiré." },
     { q: "Qui peut voir mon feedback ?", a: "Le destinataire et son responsable d’équipe, selon les règles de visibilité définies avec SBS. Pour un feedback nominatif, votre nom est visible ; pour un feedback anonyme, jamais." },
+    { q: "Qui crée les missions ?", a: "Les responsables d’équipe ou de mission, pas les RH. Chaque mission porte un numéro OTP, une durée en heures, un responsable et ses participants." },
     { q: "Pourquoi la note est-elle facultative ?", a: "Parce que les réponses écrites passent en premier. La note de 1 à 5 est proposée après, comme résumé complémentaire. Elle n’est jamais obligatoire par défaut." },
     { q: "Comment est calculée une moyenne ?", a: "Par compétence, en additionnant les notes données puis en divisant par leur nombre. Une note absente n’est pas un zéro. Aucune pondération, aucun score global." },
     { q: "La plateforme remplace-t-elle l’évaluation annuelle ?", a: "Non. Elle recueille des feedbacks et prépare une synthèse. La note finale reste décidée par le responsable, dans l’outil actuel de SBS." },

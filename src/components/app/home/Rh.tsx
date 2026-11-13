@@ -1,10 +1,10 @@
 "use client";
-import { AlertTriangle, CalendarClock, FilePlus2, Link2, Siren } from "lucide-react";
+import { AlertTriangle, CalendarClock, Inbox, ShieldCheck, Siren, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { act } from "@/lib/store/store";
-import { extendLink, sendReminders } from "@/lib/store/actions";
-import { clientLinkValidity, daysBetween, relDate } from "@/lib/store/engine";
+import { sendReminders, remindRequest } from "@/lib/store/actions";
+import { daysBetween } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
 import { feedbackSeries, participationByDepartment, quotaFor, rhKpis, activeUsers } from "@/lib/store/selectors";
 import { Button } from "@/components/ui/Button";
@@ -13,23 +13,24 @@ import { LineChart } from "@/components/charts/LineChart";
 import { BarList } from "@/components/charts/BarList";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { Kpi } from "../Kpi";
-import { useShell } from "../ShellContext";
 import { useToast } from "@/components/ui/Toast";
 
 export function RhHome() {
   const { s, open, me } = useSession();
   const router = useRouter();
-  const shell = useShell();
   const toast = useToast();
   const k = rhKpis(s);
   const series = feedbackSeries(s, open.id, 12);
   const byDept = participationByDepartment(s);
   const behind = activeUsers(s).filter((u) => u.role !== "ADMIN_TECH" && !quotaFor(s, u.id, open.id).reached);
-  const expiring = s.clientLinks.filter((l) => clientLinkValidity(l, s.clientResponses, s.now) === "OK" && daysBetween(s.now, l.expiresAt) <= 7);
+  const overdue = s.tasks.filter((t) => t.status === "EN_ATTENTE").map((t) => s.requests.find((r) => r.id === t.requestId)!).filter((r) => r && daysBetween(r.dueDate, s.now) > 0);
+  const overdueGivers = [...new Set(s.tasks.filter((t) => t.status === "EN_ATTENTE" && overdue.some((r) => r.id === t.requestId)).map((t) => t.giverId))];
+  const mandatoryLate = behind.filter((u) => quotaFor(s, u.id, open.id).mandatory && quotaFor(s, u.id, open.id).missingGiven > 0);
   const unvalidated = s.syntheses.filter((x) => x.cycleId === open.id && x.status !== "VALIDEE");
   const attention = [
     behind.length > 0 && { id: "q", icon: <Siren className="size-4" />, text: `${behind.length} collaborateurs sous l’objectif`, action: "Relancer", run: () => { act((d) => sendReminders(d, me?.id ?? null, "OBJECTIF", "t-rappel-objectif", behind.map((b) => b.id))); toast({ title: `${behind.length} rappels envoyés` }); } },
-    ...expiring.map((l) => ({ id: l.id, icon: <Link2 className="size-4" />, text: `Un lien client expire ${relDate(s.now, l.expiresAt)}`, action: "Prolonger", run: () => { act((d) => extendLink(d, me?.id ?? "", l.id, 14)); toast({ title: "Lien prolongé de 14 jours" }); } })),
+    overdue.length > 0 && { id: "d", icon: <Inbox className="size-4" />, text: `${overdue.length} demande${overdue.length > 1 ? "s" : ""} de feedback sans réponse après l’échéance`, action: "Relancer", run: () => { act((d) => overdue.forEach((r) => remindRequest(d, r.id))); toast({ title: `${overdueGivers.length} rappel${overdueGivers.length > 1 ? "s" : ""} envoyé${overdueGivers.length > 1 ? "s" : ""}` }); } },
+    mandatoryLate.length > 0 && { id: "m", icon: <ShieldCheck className="size-4" />, text: `${mandatoryLate.length} retour${mandatoryLate.length > 1 ? "s" : ""} obligatoire${mandatoryLate.length > 1 ? "s" : ""} non réalisé${mandatoryLate.length > 1 ? "s" : ""}`, action: "Suivre", run: () => router.push("/app/suivi") },
     s.scenario === 3 && unvalidated.length > 0 && { id: "s", icon: <CalendarClock className="size-4" />, text: `${unvalidated.length} synthèses ne sont pas encore validées`, action: "Suivre", run: () => router.push("/app/cycles") },
   ].filter(Boolean) as Array<{ id: string; icon: React.ReactNode; text: string; action: string; run: () => void }>;
   const daily = series.map((x) => x.named + x.anonymous);
@@ -71,9 +72,8 @@ export function RhHome() {
         <Card>
           <CardHeader title="Actions rapides" />
           <div className="flex flex-col gap-2.5">
-            <Button variant="secondary" className="justify-start" icon={<FilePlus2 className="size-4" />} onClick={shell.openMission}>Créer une mission</Button>
-            <Button variant="secondary" className="justify-start" icon={<Link2 className="size-4" />} onClick={() => router.push("/app/feedback-client?nouveau=1")}>Créer un lien client</Button>
             <Button variant="secondary" className="justify-start" icon={<Siren className="size-4" />} onClick={() => router.push("/app/suivi")}>Ouvrir Suivi & rappels</Button>
+            <Button variant="secondary" className="justify-start" icon={<Users className="size-4" />} onClick={() => router.push("/app/collaborateurs")}>Gérer les collaborateurs</Button>
           </div>
           <Link href="/app/parametres" className="mt-4 block text-sm text-text-secondary underline-offset-2 hover:text-ink hover:underline">Règles de visibilité et objectifs →</Link>
         </Card>

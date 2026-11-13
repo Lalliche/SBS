@@ -56,7 +56,7 @@ export function Sidebar({ collapsed, onToggle, mobile, onNavigate }: { collapsed
   const groups = navFor(me.role);
   const counts = { tasks: pendingTasks(s, me.id).length, synth: synthesesToWrite(s, me.id).length };
   const isActive = (href: string, key: string) => {
-    if (key === "missions-all" || key === "missions") return path.startsWith("/app/missions");
+    if (key === "missions") return path.startsWith("/app/missions");
     if (key === "aide") return path.startsWith("/app/aide");
     return path === href || path.startsWith(href + "/");
   };

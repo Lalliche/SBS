@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { average, clientLinkValidity, competencyStats, evolution, questionBankWarning, quotaProgress, relationOf } from "./engine";
+import { average, can, clientLinkValidity, competencyStats, evolution, questionBankWarning, quotaProgress, relationOf } from "./engine";
 import { buildSeed } from "./seed";
 import { giveAnonymous, giveNamed, completeTaskAnonymously } from "./actions";
 import { feedbackAbout, sentBy } from "./selectors";
@@ -38,7 +38,7 @@ describe("engine rules", () => {
   });
   it("Lucas ring is 3 / 5 in scenario 2 and 9 feedbacks at end of cycle", () => {
     const s2 = seed(2);
-    const q = quotaProgress({ user: u(s2, "lucas"), users: s2.users, named: s2.named, anonymous: s2.anonymous, rule: s2.cycles[1].quotaRule, countsMode: "RECUS", anonymousCounts: true, cycleProgress: 0.4 });
+    const q = quotaProgress({ user: u(s2, "lucas"), users: s2.users, named: s2.named, anonymous: s2.anonymous, rule: s2.cycles[1].quotaRule, tasks: s2.tasks, anonymousCounts: true, cycleProgress: 0.4 });
     expect(q.received).toBe(3);
     expect(q.missing).toBe(2);
     expect(q.missingDirect).toBe(1);
@@ -51,9 +51,41 @@ describe("engine rules", () => {
     const s = seed();
     const link = s.clientLinks[0];
     expect(clientLinkValidity(link, s.clientResponses, s.now)).toBe("OK");
-    expect(clientLinkValidity(s.clientLinks[1], s.clientResponses, s.now)).toBe("EXPIRE");
-    expect(clientLinkValidity({ ...link, maxResponses: 3 }, s.clientResponses, s.now)).toBe("MAX_ATTEINT");
+    expect(clientLinkValidity(s.clientLinks.find((l) => l.id === "cl-2")!, s.clientResponses, s.now)).toBe("EXPIRE");
+    // one link = one client = one answer: an answered link is complete
+    expect(clientLinkValidity(s.clientLinks.find((l) => l.id === "cl-3")!, s.clientResponses, s.now)).toBe("MAX_ATTEINT");
     expect(clientLinkValidity({ ...link, status: "DESACTIVE" }, s.clientResponses, s.now)).toBe("DESACTIVE");
+  });
+  it("CDC 3.7: every client link names one client and each answered link carries that client", () => {
+    const s = seed();
+    for (const l of s.clientLinks) {
+      expect(l.clientName).toBeTruthy();
+      expect(l.clientEmail).toContain("@");
+      expect(l.maxResponses).toBe(1);
+    }
+    for (const r of s.clientResponses) {
+      const l = s.clientLinks.find((x) => x.id === r.linkId)!;
+      expect(r.clientName).toBe(l.clientName);
+    }
+  });
+  it("CDC 3.1: HR cannot manage missions; responsables can; HR cannot send client links", () => {
+    const s = seed();
+    expect(can(u(s, "sophie"), "mission.create")).toBe(false);
+    expect(can(u(s, "thomas"), "mission.create")).toBe(true);
+    expect(can(u(s, "sophie"), "clientlink.manage")).toBe(false);
+    expect(can(u(s, "lucas"), "clientlink.manage")).toBe(true);
+    expect(s.missions.every((m) => s.users.find((x) => x.id === m.leadId)!.role !== "ADMIN_RH")).toBe(true);
+    expect(s.missions.every((m) => /^OTP-/.test(m.otp) && m.hours > 0)).toBe(true);
+  });
+  it("CDC 3.10 / 3.5: given count and mandatory feedback for juniors", () => {
+    const s = seed();
+    const rule = s.cycles[1].quotaRule;
+    const args = { users: s.users, named: s.named, anonymous: s.anonymous, tasks: s.tasks, rule, anonymousCounts: true, cycleProgress: 0.4 };
+    const junior = quotaProgress({ ...args, user: u(s, "nadia") });
+    expect(junior.mandatory).toBe(true);
+    expect(junior.minGiven).toBe(3);
+    expect(junior.given).toBeGreaterThanOrEqual(0);
+    expect(quotaProgress({ ...args, user: u(s, "lucas") }).mandatory).toBe(false);
   });
   it("scenario 3 has 22 syntheses: 9 validated, 6 in writing, 7 not started", () => {
     const s = seed(3);

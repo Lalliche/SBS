@@ -26,13 +26,13 @@ export default function MissionsPage() {
   const loading = useFirstLoad();
   const [tab, setTab] = useState<"EN_COURS" | "TERMINEE">("EN_COURS");
   const [q, setQ] = useState("");
-  const all = useMemo(() => (me ? (can("mission.viewAll") ? s.missions.filter((m) => m.cycleId === cycle.id) : missionsOf(s, me.id, cycle.id)) : []), [s, me, can, cycle.id]);
+  const all = useMemo(() => (me ? missionsOf(s, me.id, cycle.id) : []), [s, me, cycle.id]);
   const rows = all.filter((m) => m.status === tab && m.name.toLowerCase().includes(q.trim().toLowerCase()));
   if (!me) return null;
   const canCreate = can("mission.create") || s.settings.visibility.anyoneCreatesMission;
   return (
-    <Guard any={["mission.viewAll", "feedback.give"]}>
-      <PageHeader title="Missions" description={can("mission.viewAll") ? "Toutes les missions du cycle et leurs participants." : "Les missions auxquelles vous participez."} actions={canCreate && !readOnly ? <Button icon={<Plus className="size-4" />} onClick={shell.openMission}>Nouvelle mission</Button> : undefined} />
+    <Guard action="feedback.give">
+      <PageHeader title="Mes missions" description="Les missions que vous pilotez ou auxquelles vous participez. Elles sont créées et gérées par les responsables." actions={canCreate && !readOnly ? <Button icon={<Plus className="size-4" />} onClick={shell.openMission}>Nouvelle mission</Button> : undefined} />
       <Tabs label="Statut" className="mb-4" value={tab} onChange={setTab} items={[{ value: "EN_COURS", label: "En cours", count: all.filter((m) => m.status === "EN_COURS").length }, { value: "TERMINEE", label: "Terminées", count: all.filter((m) => m.status === "TERMINEE").length }]} />
       {loading ? (
         <div className="flex flex-col gap-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-11" />)}</div>
@@ -47,9 +47,11 @@ export default function MissionsPage() {
           defaultSort={{ key: "dates", dir: "desc" }}
           columns={[
             { key: "name", header: "Mission", sort: (a, b) => a.name.localeCompare(b.name), cell: (m) => <span className="font-medium text-ink">{m.name}</span> },
+            { key: "otp", header: "OTP", hideBelow: "md", sort: (a, b) => a.otp.localeCompare(b.otp), cell: (m) => <span className="font-mono text-xs text-text-secondary">{m.otp}</span> },
             { key: "lead", header: "Responsable", hideBelow: "md", cell: (m) => { const l = s.users.find((u) => u.id === m.leadId); return l ? fullName(l) : "—"; } },
             { key: "people", header: "Participants", hideBelow: "lg", cell: (m) => <AvatarStack users={s.users.filter((u) => m.participantIds.includes(u.id))} depts={s.departments} /> },
             { key: "dates", header: "Dates", hideBelow: "lg", sort: (a, b) => a.startDate.localeCompare(b.startDate), cell: (m) => <span className="text-text-secondary">{fmtDay(m.startDate)} → {fmtDate(m.endDate)}</span> },
+            { key: "h", header: "Heures", align: "end", hideBelow: "lg", sort: (a, b) => a.hours - b.hours, cell: (m) => `${m.hours} h` },
             { key: "fb", header: "Feedbacks", align: "end", sort: (a, b) => missionFeedbackCount(s, a.id) - missionFeedbackCount(s, b.id), cell: (m) => missionFeedbackCount(s, m.id) },
             { key: "status", header: "Statut", cell: (m) => <StatusPill status={m.status} /> },
           ]}

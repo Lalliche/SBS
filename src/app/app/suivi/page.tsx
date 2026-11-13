@@ -29,7 +29,7 @@ export default function SuiviPage() {
   const { s, me, open } = useSession();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("participation");
-  const [view, setView] = useState<"all" | "late" | "leaders" | "dept">("all");
+  const [view, setView] = useState<"all" | "late" | "mandatory" | "leaders" | "dept">("all");
   const [dept, setDept] = useState("");
   const [modal, setModal] = useState(false);
   const [aud, setAud] = useState<"OBJECTIF" | "DEMANDES" | "RESPONSABLES">("OBJECTIF");
@@ -39,7 +39,7 @@ export default function SuiviPage() {
   const series = feedbackSeries(s, open.id, 12);
   const byDept = participationByDepartment(s);
   const grades = ["Junior", "Consultant", "Senior", "Manager", "Directeur"].map((g) => { const p = rows.filter((r) => r.user.grade === g); const ok = p.filter((r) => r.q.reached).length; return { id: g, label: g, sub: `${ok}/${p.length}`, value: p.length ? ok / p.length : 0, display: `${p.length ? Math.round((ok / p.length) * 100) : 0} %` }; }).filter((x) => x.sub !== "0/0");
-  const shown = rows.filter((r) => (view === "late" ? !r.q.reached : view === "leaders" ? r.user.role === "RESPONSABLE" : view === "dept" ? (dept ? r.user.departmentId === dept : true) : true));
+  const shown = rows.filter((r) => (view === "late" ? !r.q.reached : view === "mandatory" ? r.q.mandatory && r.q.missingGiven > 0 : view === "leaders" ? r.user.role === "RESPONSABLE" : view === "dept" ? (dept ? r.user.departmentId === dept : true) : true));
   const audience = () => (aud === "OBJECTIF" ? rows.filter((r) => !r.q.reached).map((r) => r.user.id) : aud === "DEMANDES" ? [...new Set(s.tasks.filter((t) => t.status === "EN_ATTENTE").map((t) => t.giverId))] : s.users.filter((u) => u.role === "RESPONSABLE").map((u) => u.id));
   return (
     <Guard action="follow.view">
@@ -54,7 +54,7 @@ export default function SuiviPage() {
       )}
       {tab === "objectifs" && (
         <>
-          <SavedViews value={view} onChange={setView} views={[{ value: "all", label: "Tous", count: rows.length }, { value: "late", label: "En retard", count: rows.filter((r) => !r.q.reached).length }, { value: "leaders", label: "Responsables", count: rows.filter((r) => r.user.role === "RESPONSABLE").length }, { value: "dept", label: "Par département" }]} />
+          <SavedViews value={view} onChange={setView} views={[{ value: "all", label: "Tous", count: rows.length }, { value: "late", label: "En retard", count: rows.filter((r) => !r.q.reached).length }, { value: "mandatory", label: "Retour obligatoire non réalisé", count: rows.filter((r) => r.q.mandatory && r.q.missingGiven > 0).length }, { value: "leaders", label: "Responsables", count: rows.filter((r) => r.user.role === "RESPONSABLE").length }, { value: "dept", label: "Par département" }]} />
           {view === "dept" && <div className="mb-3 max-w-[18em]"><SelectInput label="Département" value={dept} onChange={setDept} options={[{ value: "", label: "Tous" }, ...s.departments.map((d) => ({ value: d.id, label: d.name }))]} /></div>}
           <DataTable<Row>
             caption="Objectifs de feedback"
@@ -67,6 +67,7 @@ export default function SuiviPage() {
               { key: "p", header: "Collaborateur", sort: (a, b) => a.user.lastName.localeCompare(b.user.lastName), cell: (r) => <PersonChip user={r.user} dept={s.departments.find((d) => d.id === r.user.departmentId)} /> },
               { key: "r", header: "Objectif", cell: (r) => <span className="flex items-center gap-2.5"><ProgressRing value={r.q.ratio} size="2.1em" stroke={12} tone={r.q.reached ? "success" : "ink"} label={`${r.q.received} sur ${r.q.target}`} /><span className="tabular-nums text-text-secondary">{r.q.received} / {r.q.target}</span></span> },
               { key: "rc", header: "Reçus", align: "end", sort: (a, b) => a.q.received - b.q.received, cell: (r) => r.q.received },
+              { key: "gv", header: "Donnés", align: "end", sort: (a, b) => a.q.given - b.q.given, cell: (r) => <span className={r.q.mandatory && r.q.missingGiven > 0 ? "font-medium text-danger" : ""}>{r.q.given} / {r.q.minGiven}{r.q.mandatory ? " · obl." : ""}</span> },
               { key: "d", header: "De l’entourage direct", align: "end", hideBelow: "md", cell: (r) => r.q.fromDirectReports },
               { key: "s", header: "Statut", cell: (r) => <StatusPill status={r.q.status} /> },
             ]}

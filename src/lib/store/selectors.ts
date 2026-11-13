@@ -87,7 +87,7 @@ export function quotaFor(s: AppState, userId: string, cycleId?: string) {
     named: s.named.filter((f) => f.cycleId === cycle.id),
     anonymous: s.anonymous.filter((f) => f.cycleId === cycle.id),
     rule: cycle.quotaRule,
-    countsMode: s.settings.countsMode,
+    tasks: s.tasks,
     anonymousCounts: s.settings.visibility.anonymousCountsInQuota,
     cycleProgress: cycleProgress(cycle.startDate, cycle.endDate, s.now),
   });
@@ -246,3 +246,13 @@ export function relationChip(rel: Relation | null) {
   return rel ? relationLabel[rel] : null;
 }
 export const _deps = { addDays, average };
+
+/** Client links a user may see: those they created, those on missions they lead, and (per rules Q7 / Q8) on missions they take part in. */
+export function visibleClientLinks(s: AppState, userId: string) {
+  const v = s.settings.visibility;
+  return s.clientLinks.filter((l) => {
+    const m = s.missions.find((x) => x.id === l.missionId);
+    if (l.createdById === userId || m?.leadId === userId) return true;
+    return !!m?.participantIds.includes(userId) && (v.seeClientFeedback || v.participantsSeeClient);
+  });
+}

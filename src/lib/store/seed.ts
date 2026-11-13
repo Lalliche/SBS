@@ -20,7 +20,7 @@ import type {
   User,
 } from "./types";
 
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 
 /* ---------- PRNG ---------- */
 export function mulberry32(seed: number) {
@@ -157,7 +157,7 @@ const MISSIONS: M[] = [
   ["m-02", "Revue de la gouvernance des filiales", "Diagnostic des instances de décision et des délégations d’autorité.", "2026-08-03", "2027-02-26", "rachid", ["rachid", "samir", "meriem", "nadia"]],
   ["m-03", "Plateforme de pilotage de la performance", "Conception d’un tableau de bord de pilotage pour la direction.", "2026-07-13", "2027-03-31", "amine", ["amine", "lina", "mehdi", "sarah", "claire", "thomas"]],
   ["m-04", "Audit de conformité opérationnelle", "Revue des processus clés et plan de remédiation priorisé.", "2026-08-17", "2027-04-16", "samir", ["samir", "meriem", "imane", "nadia", "leila"]],
-  ["m-05", "Refonte du dispositif de rémunération", "Étude comparative et proposition d’une grille de rémunération.", "2026-07-20", "2027-05-14", "sophie", ["sophie", "djamel", "houda", "lucas", "farid"]],
+  ["m-05", "Refonte du dispositif de rémunération", "Étude comparative et proposition d’une grille de rémunération.", "2026-07-20", "2027-05-14", "amel", ["amel", "sophie", "djamel", "houda", "lucas", "farid"]],
   ["m-06", "Cartographie des risques — Secteur bancaire", "Identification et hiérarchisation des risques opérationnels.", "2026-09-01", "2027-05-28", "thomas", ["thomas", "lucas", "nadia", "yanis", "claire", "rachid"]],
   ["m-07", "Optimisation du budget et du reporting", "Simplification du cycle budgétaire et du reporting mensuel.", "2026-09-14", "2027-03-12", "omar", ["omar", "leila", "yacine", "samir"]],
   ["m-08", "Mise en place d’un entrepôt de données", "Structuration des flux de données et des indicateurs de référence.", "2026-07-27", "2027-06-04", "amine", ["amine", "mehdi", "kenza", "anis", "bilal"]],
@@ -183,7 +183,7 @@ function buildSettings(): Settings {
       seeClientFeedback: false,
       participantsSeeClient: false,
       allowAnonymousOnRequest: true,
-      showRelationOnAnonymous: true,
+      showRelationOnAnonymous: false, // CDC 3.8: the giver's relation is shown except on anonymous feedback
       rhCanHideAnonymous: true,
       anonymousCountsInQuota: true,
       anyoneCreatesMission: false,
@@ -195,8 +195,7 @@ function buildSettings(): Settings {
     },
     noteMode: "PAR_COMPETENCE",
     noteRequired: false,
-    countsMode: "RECUS",
-    quotas: { minReceived: 5, minFromDirectReports: 1, teamLeaderNeedsTeamFeedback: true },
+    quotas: { minReceived: 5, minGiven: 3, minFromDirectReports: 1, teamLeaderNeedsTeamFeedback: true, mandatory: { enabled: true, grades: ["Junior"] } },
     retentionDays: 90,
     sender: "feedback@sbsfirm.example",
     notificationPrefs: { DEMANDE: true, RAPPEL: true, SYNTHESE: true, SYSTEME: true, FEEDBACK: true, CLIENT: true },
@@ -272,19 +271,22 @@ export function buildSeed(scenario: Scenario, sessionUserId: string | null = nul
       status: archivedFY27 ? "ARCHIVE" : "OUVERT",
       quotaRule: settings.quotas,
       reminderRules: reminderRules(scenario === 1 ? null : addDays(now, -6)),
-      aiMode: "ASSISTE",
+      aiMode: "MANUEL",
     },
   ];
   if (archivedFY27) {
-    cycles.push({ id: "cy-fy28", name: "FY28", startDate: "2027-07-01T00:00:00.000Z", endDate: "2028-06-30T23:59:59.000Z", status: "OUVERT", quotaRule: settings.quotas, reminderRules: reminderRules(null), aiMode: "ASSISTE" });
+    cycles.push({ id: "cy-fy28", name: "FY28", startDate: "2027-07-01T00:00:00.000Z", endDate: "2028-06-30T23:59:59.000Z", status: "OUVERT", quotaRule: settings.quotas, reminderRules: reminderRules(null), aiMode: "MANUEL" });
   }
   const feedCycleId = "cy-fy27";
 
   /* Missions (only those that have started by `now`) */
+  const HOURS = [320, 180, 640, 260, 150, 520, 210, 760, 300, 240, 410, 180, 350, 90];
   const missions = MISSIONS.filter((m) => new Date(m[3] + "T00:00:00Z") <= new Date(now)).map(([id, name, description, start, end, lead, people]) => ({
     id,
     cycleId: feedCycleId,
     name,
+    otp: `OTP-26-${String(140 + (parseInt(id.slice(2), 10) - 1) * 7).padStart(4, "0")}`,
+    hours: HOURS[parseInt(id.slice(2), 10) - 1] ?? 200,
     description,
     startDate: start + "T00:00:00.000Z",
     endDate: end + "T00:00:00.000Z",
@@ -463,20 +465,26 @@ export function buildSeed(scenario: Scenario, sessionUserId: string | null = nul
     });
   }
 
-  /* Client links */
+  /* Client links — ONE link per client (CDC 3.7) */
   const clientLinks: AppState["clientLinks"] = [];
   const clientResponses: AppState["clientResponses"] = [];
   if (scenario >= 2) {
-    clientLinks.push(
-      { id: "cl-1", token: "energie-7kq2", missionId: "m-01", title: "Votre avis sur notre accompagnement — Schéma directeur de transformation", welcome: "Merci de prendre quelques minutes pour partager votre retour sur la mission.", questionIds: ["qc-1", "qc-2", "qc-3", "qc-4"], expiresAt: addDays(now, 3), maxResponses: 10, identification: "FACULTATIVE", status: "ACTIF", createdAt: addDays(now, -25) },
-      { id: "cl-2", token: "diag-4mx9", missionId: "m-13", title: "Votre retour sur le diagnostic organisationnel", welcome: "Votre avis nous aide à améliorer nos missions.", questionIds: ["qc-1", "qc-2", "qc-4"], expiresAt: addDays(now, -10), maxResponses: 5, identification: "AUCUNE", status: "EXPIRE", createdAt: addDays(now, -60) },
-    );
+    const q4 = ["qc-1", "qc-2", "qc-3", "qc-4"];
+    const mk = (id: string, token: string, mission: string, by: string, client: string, company: string, email: string, title: string, expiresIn: number, createdAgo: number) =>
+      clientLinks.push({ id, token, missionId: mission, createdById: uid(by), clientName: client, company, clientEmail: email, title, welcome: `Bonjour ${client.split(" ")[0]}, merci de prendre quelques minutes pour partager votre retour sur la mission.`, questionIds: q4, expiresAt: addDays(now, expiresIn), maxResponses: 1, status: expiresIn < 0 ? "EXPIRE" : "ACTIF", createdAt: addDays(now, -createdAgo) });
+    // pending link (the one used by the demo bar "Ouvrir le lien client")
+    mk("cl-1", "energie-7kq2", "m-01", "thomas", "Samia Ait-Ali", "Direction du groupe", "s.aitali@client-a.example", "Votre avis sur notre accompagnement — Schéma directeur de transformation", 3, 25);
+    // already answered
+    mk("cl-3", "energie-m3dk", "m-01", "thomas", "Mourad Kaddour", "Direction des opérations", "m.kaddour@client-a.example", "Votre avis sur notre accompagnement — Schéma directeur de transformation", 20, 22);
+    mk("cl-4", "energie-p8rv", "m-01", "lucas", "Lilia Bensaïd", "Direction financière", "l.bensaid@client-a.example", "Votre avis sur notre accompagnement — Schéma directeur de transformation", 18, 20);
+    // expired, unanswered
+    mk("cl-2", "diag-4mx9", "m-13", "thomas", "Rachid Medjahed", "Groupe industriel", "r.medjahed@client-b.example", "Votre retour sur le diagnostic organisationnel", -10, 60);
     [
-      ["Samia Ait-Ali", "Direction du groupe", 5, -14],
-      ["", "", 4, -9],
-      ["Mourad Kaddour", "Direction des opérations", 5, -4],
-    ].forEach(([name, company, rating, offset], i) => {
-      clientResponses.push({ id: `cr-${i + 1}`, linkId: "cl-1", missionId: "m-01", clientName: (name as string) || undefined, company: (company as string) || undefined, answers: { "qc-1": String(rating), "qc-2": String(rating), "qc-3": "5", "qc-4": CLIENT_COMMENTS[i] }, rating: rating as number, createdAt: addDays(now, offset as number) });
+      ["cl-3", 5, -14, 0],
+      ["cl-4", 4, -9, 1],
+    ].forEach(([linkId, rating, offset, ci], i) => {
+      const l = clientLinks.find((x) => x.id === linkId)!;
+      clientResponses.push({ id: `cr-${i + 1}`, linkId: l.id, missionId: l.missionId, clientName: l.clientName, company: l.company, answers: { "qc-1": String(rating), "qc-2": String(rating), "qc-3": "5", "qc-4": CLIENT_COMMENTS[ci as number] }, rating: rating as number, createdAt: addDays(now, offset as number) });
     });
   }
 
@@ -493,7 +501,9 @@ export function buildSeed(scenario: Scenario, sessionUserId: string | null = nul
     note("lucas", "RAPPEL", "Votre objectif : 3 / 5", "Il vous manque 2 feedbacks, dont 1 de votre responsable ou de votre équipe.", "/app/accueil", 4);
     note("thomas", "FEEDBACK", "Nouveau feedback sur votre équipe", "Un feedback anonyme a été reçu pour l’un de vos collaborateurs.", "/app/equipe", 18);
     note("thomas", "RAPPEL", "2 collaborateurs sous l’objectif", "Nadia Cherif et Yanis Benali n’ont pas atteint leur objectif.", "/app/equipe", 2);
-    note("sophie", "CLIENT", "Un lien client expire bientôt", "Le lien « Schéma directeur de transformation » expire dans 3 jours.", "/app/feedback-client", 0);
+    note("thomas", "CLIENT", "Un lien client expire bientôt", "Le lien envoyé à Samia Ait-Ali (« Schéma directeur de transformation ») expire dans 3 jours.", "/app/feedback-client", 0);
+    note("thomas", "CLIENT", "Retour client reçu", "Lilia Bensaïd (Direction financière) a répondu.", "/app/feedback-client", 9);
+    note("sophie", "RAPPEL", "Retours obligatoires non réalisés", "Des profils juniors n’ont pas encore donné leur minimum de feedbacks.", "/app/suivi", 1);
     note("sophie", "RAPPEL", "6 collaborateurs sous l’objectif", "Vous pouvez envoyer un rappel depuis Suivi & rappels.", "/app/suivi", 3);
     note("sophie", "SYSTEME", "Sauvegarde quotidienne effectuée", "Une sauvegarde automatique a été créée ce matin.", "/app/parametres", 0, true);
     note("karim", "SYSTEME", "Sauvegarde quotidienne effectuée", "Taille : 412 Ko. Conservation : 90 jours.", "/app/parametres", 0);

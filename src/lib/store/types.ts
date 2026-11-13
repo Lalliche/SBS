@@ -35,8 +35,12 @@ export interface User {
 
 export interface QuotaRule {
   minReceived: number;
+  /** CDC 3.10: objectives cover feedback given AND received. */
+  minGiven: number;
   minFromDirectReports: number;
   teamLeaderNeedsTeamFeedback: boolean;
+  /** CDC 3.5: giving feedback is mandatory for some profiles (e.g. juniors). */
+  mandatory: { enabled: boolean; grades: Grade[] };
 }
 
 export interface ReminderRule {
@@ -63,6 +67,9 @@ export interface Mission {
   id: string;
   cycleId: string;
   name: string;
+  /** CDC 3.4: numéro OTP and budgeted hours. */
+  otp: string;
+  hours: number;
   description: string;
   startDate: string;
   endDate: string;
@@ -184,12 +191,16 @@ export interface ClientLink {
   id: string;
   token: string;
   missionId: string;
+  createdById: string;
+  /** CDC 3.7: ONE link per client — the client is known from creation. */
+  clientName: string;
+  company: string;
+  clientEmail: string;
   title: string;
   welcome: string;
   questionIds: string[];
   expiresAt: string;
   maxResponses: number;
-  identification: "AUCUNE" | "FACULTATIVE" | "OBLIGATOIRE";
   status: LinkStatus;
   createdAt: string;
 }
@@ -198,8 +209,8 @@ export interface ClientResponse {
   id: string;
   linkId: string;
   missionId: string;
-  clientName?: string;
-  company?: string;
+  clientName: string;
+  company: string;
   answers: Record<string, string>;
   rating?: number;
   createdAt: string;
@@ -255,7 +266,6 @@ export interface Settings {
   visibility: VisibilityRules;
   noteMode: "PAR_COMPETENCE" | "PAR_MISSION";
   noteRequired: boolean;
-  countsMode: "RECUS" | "DONNES";
   quotas: QuotaRule;
   retentionDays: number;
   sender: string;

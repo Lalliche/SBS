@@ -38,7 +38,7 @@ export function CommandPalette({ open, onClose, onGive, onRequest, onCreateMissi
           const d = s.departments.find((x) => x.id === u.departmentId);
           list.push({ id: `u-${u.id}`, group: "Personnes", label: fullName(u), hint: u.jobTitle, icon: <Avatar user={u} dept={d} size="xs" />, run: me.role === "RESPONSABLE" && u.leaderIds.includes(me.id) ? go(`/app/equipe/${u.id}`) : go(`/app/collaborateurs?q=${encodeURIComponent(u.lastName)}`) });
         });
-    const myMissions = can("mission.viewAll") ? s.missions : s.missions.filter((m) => m.participantIds.includes(me.id));
+    const myMissions = s.missions.filter((m) => m.participantIds.includes(me.id) || m.leadId === me.id);
     myMissions.forEach((m) => list.push({ id: `m-${m.id}`, group: "Missions", label: m.name, icon: <FilePlus2 className="size-4" />, run: go(`/app/missions/${m.id}`) }));
     if (can("feedback.give")) {
       list.push({ id: "a-give", group: "Actions rapides", label: "Donner un feedback", icon: <Send className="size-4" />, run: onGive });

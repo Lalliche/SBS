@@ -25,7 +25,8 @@ export const NAV: NavGroup[] = [
       { key: "accueil", label: "Accueil", href: "/app/accueil", icon: LayoutDashboard, roles: ALL, tour: "nav-accueil" },
       { key: "demandes", label: "Mes demandes", href: "/app/demandes", icon: Inbox, roles: USERS3, badge: "tasks", tour: "nav-demandes" },
       { key: "feedbacks", label: "Mes feedbacks", href: "/app/feedbacks", icon: MessageSquareText, roles: USERS3 },
-      { key: "missions", label: "Mes missions", href: "/app/missions", icon: ClipboardList, roles: ["COLLABORATEUR", "RESPONSABLE"] },
+      { key: "missions", label: "Mes missions", href: "/app/missions", icon: ClipboardList, roles: ["COLLABORATEUR", "RESPONSABLE", "ADMIN_RH"], tour: "nav-missions" },
+      { key: "client", label: "Retours client", href: "/app/feedback-client", icon: Link2, roles: ["COLLABORATEUR", "RESPONSABLE"], tour: "nav-client" },
     ],
   },
   {
@@ -39,9 +40,7 @@ export const NAV: NavGroup[] = [
     label: "Pilotage RH",
     items: [
       { key: "cycles", label: "Cycles", href: "/app/cycles", icon: CalendarRange, roles: ["ADMIN_RH"], tour: "nav-cycles" },
-      { key: "missions-all", label: "Missions", href: "/app/missions", icon: ClipboardList, roles: ["ADMIN_RH"], tour: "nav-missions" },
       { key: "suivi", label: "Suivi & rappels", href: "/app/suivi", icon: Gauge, roles: ["ADMIN_RH"], tour: "nav-suivi" },
-      { key: "client", label: "Feedback client", href: "/app/feedback-client", icon: Link2, roles: ["ADMIN_RH"], tour: "nav-client" },
     ],
   },
   {
@@ -76,7 +75,7 @@ export const CRUMBS: Record<string, string> = {
   syntheses: "Synthèses",
   cycles: "Cycles",
   suivi: "Suivi & rappels",
-  "feedback-client": "Feedback client",
+  "feedback-client": "Retours client",
   collaborateurs: "Collaborateurs",
   competences: "Compétences & questions",
   messages: "Messages",

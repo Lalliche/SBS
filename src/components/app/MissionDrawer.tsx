@@ -26,6 +26,8 @@ function Form({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const shell = useShell();
   const [name, setName] = useState("");
+  const [otp, setOtp] = useState("");
+  const [hours, setHours] = useState("");
   const [desc, setDesc] = useState("");
   const [start, setStart] = useState(s.now.slice(0, 10));
   const [end, setEnd] = useState("");
@@ -34,13 +36,13 @@ function Form({ onClose }: { onClose: () => void }) {
   const [touched, setTouched] = useState(false);
   if (!me) return null;
   const staff = s.users.filter((u) => u.status === "ACTIF" && u.role !== "ADMIN_TECH");
-  const errs = { name: !name.trim() ? "Le nom est obligatoire." : null, end: !end ? "La date de fin est obligatoire." : end < start ? "La fin doit suivre le début." : null, lead: !lead ? "Choisissez un responsable de mission." : null, people: !people.length ? "Ajoutez au moins un participant." : null };
+  const errs = { name: !name.trim() ? "Le nom est obligatoire." : null, otp: !otp.trim() ? "Le numéro OTP est obligatoire." : null, hours: Number(hours) > 0 ? null : "Indiquez un nombre d’heures.", end: !end ? "La date de fin est obligatoire." : end < start ? "La fin doit suivre le début." : null, lead: !lead ? "Choisissez un responsable de mission." : null, people: !people.length ? "Ajoutez au moins un participant." : null };
   const invalid = Object.values(errs).some(Boolean);
   const create = (andRequest: boolean) => {
     setTouched(true);
     if (invalid) return;
     const ids = [...new Set([...people, lead])];
-    const id = act((d) => createMission(d, me.id, { name: name.trim(), description: desc.trim(), startDate: new Date(start + "T00:00:00Z").toISOString(), endDate: new Date(end + "T00:00:00Z").toISOString(), leadId: lead, participantIds: ids }));
+    const id = act((d) => createMission(d, me.id, { name: name.trim(), otp: otp.trim().toUpperCase(), hours: Number(hours), description: desc.trim(), startDate: new Date(start + "T00:00:00Z").toISOString(), endDate: new Date(end + "T00:00:00Z").toISOString(), leadId: lead, participantIds: ids }));
     toast({ title: "Mission créée", body: name.trim() });
     onClose();
     router.push(`/app/missions/${id}`);
@@ -49,6 +51,10 @@ function Form({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex flex-col gap-5">
       <TextInput label="Nom" required value={name} onChange={setName} error={touched ? errs.name : null} placeholder="Ex. Diagnostic organisationnel" />
+      <div className="grid grid-cols-2 gap-4">
+        <TextInput label="Numéro OTP" required value={otp} onChange={setOtp} error={touched ? errs.otp : null} placeholder="OTP-26-0150" />
+        <TextInput label="Durée en heures" required type="number" value={hours} onChange={setHours} error={touched ? errs.hours : null} hint="Nombre d’heures budgétées" />
+      </div>
       <TextArea label="Description" value={desc} onChange={setDesc} rows={3} />
       <div className="grid grid-cols-2 gap-4">
         <Field label="Début" required>

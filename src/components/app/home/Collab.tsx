@@ -56,6 +56,13 @@ export function CollabTasks() {
           action={!q.reached ? <Button size="sm" variant="secondary" onClick={() => shell.openRequest()}>Demander</Button> : undefined}
         />
         <TaskRow
+          icon={q.missingGiven === 0 ? <CheckCircle2 className="size-4" /> : <Send className="size-4" />}
+          done={q.missingGiven === 0}
+          title={<span>Feedbacks donnés : <span className="tabular-nums">{q.given} / {q.minGiven}</span>{q.mandatory && <Badge tone="accent" className="ms-2">Obligatoire</Badge>}</span>}
+          hint={q.missingGiven === 0 ? "Minimum atteint." : `Il vous reste ${q.missingGiven} feedback${q.missingGiven > 1 ? "s" : ""} à donner${q.mandatory ? " (retour obligatoire pour votre profil)" : ""}.`}
+          action={q.missingGiven > 0 ? <Button size="sm" variant={q.mandatory ? "primary" : "secondary"} onClick={() => router.push("/app/feedback/nouveau")}>Donner</Button> : undefined}
+        />
+        <TaskRow
           icon={<ClipboardCheck className="size-4" />}
           done={!nudge.length}
           title={nudge.length ? `${nudge.length} mission${nudge.length > 1 ? "s terminées" : " terminée"} sans feedback demandé` : "Aucune mission terminée en attente"}
@@ -80,6 +87,7 @@ export function QuotaCard() {
         <p className="text-sm font-medium text-text-secondary">Objectif du cycle</p>
         <p className="mt-0.5 text-md font-semibold text-ink">{q.reached ? "Atteint" : `${q.missing} à recevoir`}</p>
         <p className="mt-1 text-xs text-text-muted">dont ≥ {q.directTarget} de votre responsable ou équipe directe : <span className="tabular-nums font-medium text-text">{q.fromDirectReports}</span></p>
+        <p className="mt-0.5 text-xs text-text-muted">Donnés : <span className="tabular-nums font-medium text-text">{q.given} / {q.minGiven}</span>{q.mandatory && " · obligatoire"}</p>
       </div>
     </Card>
   );

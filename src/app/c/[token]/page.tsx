@@ -9,10 +9,10 @@ import { submitClientResponse } from "@/lib/store/actions";
 import { clientLinkValidity } from "@/lib/store/engine";
 import { CLIENT_QUESTIONS } from "@/lib/store/texts";
 import { Button } from "@/components/ui/Button";
-import { TextArea, TextInput } from "@/components/ui/FormInputs";
+import { TextArea } from "@/components/ui/FormInputs";
 import { Skeleton } from "@/components/ui/Surface";
 
-/* Public client page — outside the app shell, mobile-first. No account, no navigation to the app. */
+/* Public client page — outside the app shell, mobile-first. One link = one client: no account, no identification form. */
 export default function ClientPage({ params }: PageProps<"/c/[token]">) {
   const { token } = use(params);
   const hydrated = useHydrated();
@@ -20,57 +20,41 @@ export default function ClientPage({ params }: PageProps<"/c/[token]">) {
   const link = s.clientLinks.find((l) => l.token === token);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [rating, setRating] = useState(0);
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const shell = (children: React.ReactNode) => (
     <div className="min-h-svh bg-paper">
-      <div className="mx-auto flex min-h-svh max-w-[30em] flex-col bg-bg px-5 pb-10 pt-6 shadow-sm sm:my-0">
+      <div className="mx-auto flex min-h-svh max-w-[30em] flex-col bg-bg px-5 pb-10 pt-6 shadow-sm">
         <Image src={logo} alt="SBS — Sovereign Business & Strategy" className="mb-6 h-9 w-auto self-start" sizes="120px" />
         {children}
       </div>
     </div>
   );
-  if (!hydrated) return shell(<div className="flex flex-col gap-3"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>);
-  const state = !link ? "INCONNU" : sent ? "OK" : s.clientDevices.includes(link.id) ? "DEJA" : clientLinkValidity(link, s.clientResponses, s.now);
-  const msg = {
-    EXPIRE: { icon: Clock, title: "Ce lien a expiré", text: "Le délai pour répondre est dépassé. Merci de contacter votre interlocuteur chez SBS." },
-    DESACTIVE: { icon: Lock, title: "Ce lien n’est plus actif", text: "Il a été désactivé. Merci de contacter votre interlocuteur chez SBS." },
-    MAX_ATTEINT: { icon: UsersRound, title: "Nombre maximal de réponses atteint", text: "Ce lien a déjà reçu toutes les réponses attendues. Merci pour votre intérêt." },
-    DEJA: { icon: CheckCircle2, title: "Réponse déjà envoyée", text: "Nous avons bien reçu votre retour depuis cet appareil. Merci." },
-    INCONNU: { icon: Lock, title: "Lien introuvable", text: "Vérifiez l’adresse du lien ou contactez votre interlocuteur chez SBS." },
-  } as const;
-  if (state !== "OK" && link && state !== undefined && state in msg) {
-    const M = msg[state as keyof typeof msg];
-    return shell(<div className="flex flex-1 flex-col items-center justify-center gap-4 text-center"><span className="flex size-14 items-center justify-center rounded-full bg-paper"><M.icon className="size-6" /></span><h1 className="text-lg font-semibold text-ink">{M.title}</h1><p className="max-w-[22em] text-base text-text-secondary text-pretty">{M.text}</p></div>);
-  }
-  if (!link) {
-    const M = msg.INCONNU;
-    return shell(<div className="flex flex-1 flex-col items-center justify-center gap-4 text-center"><span className="flex size-14 items-center justify-center rounded-full bg-paper"><M.icon className="size-6" /></span><h1 className="text-lg font-semibold text-ink">{M.title}</h1><p className="text-base text-text-secondary">{M.text}</p></div>);
-  }
-  if (sent)
-    return shell(<div className="flex flex-1 flex-col items-center justify-center gap-4 text-center"><span className="flex size-14 items-center justify-center rounded-full bg-success-bg text-success"><CheckCircle2 className="size-7" /></span><h1 className="font-display text-xl font-semibold text-ink">Merci pour votre retour.</h1><p className="max-w-[22em] text-base text-text-secondary">Vos réponses ont bien été transmises à l’équipe SBS.</p></div>);
+  const notice = (Icon: typeof Lock, title: string, text: string) =>
+    shell(<div className="flex flex-1 flex-col items-center justify-center gap-4 text-center"><span className="flex size-14 items-center justify-center rounded-full bg-paper"><Icon className="size-6" /></span><h1 className="text-lg font-semibold text-ink">{title}</h1><p className="max-w-[22em] text-base text-text-secondary text-pretty">{text}</p></div>);
 
-  const qs = link.questionIds.map((id) => ({ id, text: CLIENT_QUESTIONS.find((q) => q.id === id)?.text ?? id })).filter((q) => q.text);
+  if (!hydrated) return shell(<div className="flex flex-col gap-3"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>);
+  if (!link) return notice(Lock, "Lien introuvable", "Vérifiez l’adresse du lien ou contactez votre interlocuteur chez SBS.");
+  if (sent)
+    return shell(<div className="flex flex-1 flex-col items-center justify-center gap-4 text-center"><span className="flex size-14 items-center justify-center rounded-full bg-success-bg text-success"><CheckCircle2 className="size-7" /></span><h1 className="font-display text-xl font-semibold text-ink">Merci pour votre retour, {link.clientName.split(" ")[0]}.</h1><p className="max-w-[22em] text-base text-text-secondary">Vos réponses ont bien été transmises à l’équipe SBS.</p></div>);
+  const v = s.clientDevices.includes(link.id) ? "DEJA" : clientLinkValidity(link, s.clientResponses, s.now);
+  if (v === "DEJA" || v === "MAX_ATTEINT") return notice(CheckCircle2, "Réponse déjà reçue pour ce lien", "Nous avons bien reçu votre retour. Merci. Ce lien ne peut recevoir qu’une seule réponse.");
+  if (v === "EXPIRE") return notice(Clock, "Ce lien a expiré", "Le délai pour répondre est dépassé. Merci de contacter votre interlocuteur chez SBS.");
+  if (v === "DESACTIVE") return notice(UsersRound, "Ce lien n’est plus actif", "Il a été désactivé. Merci de contacter votre interlocuteur chez SBS.");
+
+  const qs = link.questionIds.map((id) => ({ id, text: CLIENT_QUESTIONS.find((q) => q.id === id)?.text ?? id }));
   const submit = () => {
-    if (link.identification === "OBLIGATOIRE" && !name.trim()) return setErr("Merci d’indiquer votre nom.");
-    if (!Object.values(answers).some((v) => v.trim()) && !rating) return setErr("Répondez à au moins une question.");
-    act((d) => submitClientResponse(d, token, { clientName: name.trim(), company: company.trim(), answers: { ...answers, "qc-1": rating ? String(rating) : answers["qc-1"] ?? "" }, rating: rating || undefined }));
-    setSent(true);
+    if (!Object.values(answers).some((x) => x.trim()) && !rating) return setErr("Répondez à au moins une question.");
+    const ok = act((d) => submitClientResponse(d, token, { answers: { ...answers, "qc-1": rating ? String(rating) : answers["qc-1"] ?? "" }, rating: rating || undefined }));
+    if (ok) setSent(true);
+    else setErr("Ce lien ne peut plus recevoir de réponse.");
   };
   return shell(
     <>
-      <h1 className="font-display text-xl font-semibold leading-tight tracking-[-0.01em] text-ink text-balance">{link.title}</h1>
+      <p className="text-sm text-text-secondary">Bonjour {link.clientName.split(" ")[0]},</p>
+      <h1 className="mt-1 font-display text-xl font-semibold leading-tight tracking-[-0.01em] text-ink text-balance">{link.title}</h1>
       <p className="mt-2 text-base text-text-secondary text-pretty">{link.welcome}</p>
-      {link.identification !== "AUCUNE" && (
-        <fieldset className="mt-6 flex flex-col gap-3 rounded-lg border border-border p-4">
-          <legend className="px-1 text-sm font-medium text-ink">Vous {link.identification === "FACULTATIVE" ? "(facultatif)" : ""}</legend>
-          <TextInput label="Nom" required={link.identification === "OBLIGATOIRE"} value={name} onChange={setName} />
-          <TextInput label="Organisation" value={company} onChange={setCompany} />
-        </fieldset>
-      )}
       <div className="mt-6 flex flex-col gap-6">
         {qs.map((q, i) => (
           <div key={q.id}>
@@ -84,14 +68,14 @@ export default function ClientPage({ params }: PageProps<"/c/[token]">) {
                 ))}
               </div>
             ) : (
-              <div className="mt-2"><TextArea label="" value={answers[q.id] ?? ""} onChange={(v) => setAnswers({ ...answers, [q.id]: v })} rows={3} placeholder="Votre réponse (facultatif)" /></div>
+              <div className="mt-2"><TextArea label="" value={answers[q.id] ?? ""} onChange={(x) => setAnswers({ ...answers, [q.id]: x })} rows={3} placeholder="Votre réponse (facultatif)" /></div>
             )}
           </div>
         ))}
       </div>
       {err && <p role="alert" className="mt-4 text-sm font-medium text-danger">{err}</p>}
       <Button size="lg" className="mt-8 w-full" onClick={submit}>Envoyer mes réponses</Button>
-      <p className="mt-4 text-center text-xs text-text-muted">Aucun compte requis. Vos réponses sont transmises à SBS.</p>
+      <p className="mt-4 text-center text-xs text-text-muted">Aucun compte requis. Ce lien est personnel et ne peut recevoir qu’une réponse.</p>
     </>,
   );
 }

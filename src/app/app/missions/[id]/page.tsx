@@ -6,7 +6,8 @@ import { act } from "@/lib/store/store";
 import { completeMission, setParticipants, updateMission } from "@/lib/store/actions";
 import { clientLinkValidity, fmtDate, fmtDateLong, fullName, relDate, relationLabel, relationOf } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
-import { missionFeedbackCount } from "@/lib/store/selectors";
+import { feedbackAbout, missionFeedbackCount } from "@/lib/store/selectors";
+import { FeedbackCard } from "@/components/app/FeedbackCard";
 import type { User } from "@/lib/store/types";
 import { cn } from "@/lib/utils";
 import { Guard } from "@/components/app/Guard";
@@ -22,7 +23,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { useToast } from "@/components/ui/Toast";
 import { Kpi } from "@/components/app/Kpi";
 
-type Tab = "apercu" | "participants" | "feedbacks" | "client" | "parametres";
+type Tab = "apercu" | "participants" | "mesfeedbacks" | "feedbacks" | "client" | "parametres";
 
 export default function MissionPage({ params }: PageProps<"/app/missions/[id]">) {
   const { id } = use(params);
@@ -41,11 +42,12 @@ export default function MissionPage({ params }: PageProps<"/app/missions/[id]">)
   const participants = useMemo(() => (m ? s.users.filter((u) => m.participantIds.includes(u.id)) : []), [m, s.users]);
   if (!m || !me) return me ? notFound() : null;
   const lead = s.users.find((u) => u.id === m.leadId);
-  const canEdit = (can("mission.create") || m.leadId === me.id) && !readOnly;
+  const canEdit = (m.leadId === me.id || (can("mission.create") && m.participantIds.includes(me.id))) && !readOnly;
   const isParticipant = m.participantIds.includes(me.id);
   const requests = s.requests.filter((r) => r.missionId === m.id);
   const pendingCount = s.tasks.filter((t) => t.status === "EN_ATTENTE" && requests.some((r) => r.id === t.requestId)).length;
   const links = s.clientLinks.filter((l) => l.missionId === m.id);
+  const mine = feedbackAbout(s, me.id, m.cycleId, me.id).filter((f) => f.missionId === m.id);
   const responses = s.clientResponses.filter((r) => r.missionId === m.id);
 
   const suggestionsFor = (p: User) => {
@@ -68,14 +70,14 @@ export default function MissionPage({ params }: PageProps<"/app/missions/[id]">)
   ].sort((a, b) => b.ts.localeCompare(a.ts));
 
   return (
-    <Guard any={["mission.viewAll", "feedback.give"]}>
+    <Guard action="feedback.give">
       <PageHeader
         breadcrumb={[{ label: "Missions", href: "/app/missions" }, { label: m.name }]}
         title={m.name}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusPill status={m.status} /> {fmtDate(m.startDate)} → {fmtDate(m.endDate)}</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusPill status={m.status} /> <span className="font-mono text-xs">{m.otp}</span> · {fmtDate(m.startDate)} → {fmtDate(m.endDate)} · {m.hours} h</span>}
         actions={isParticipant && !readOnly ? <Button onClick={() => shell.openRequest({ missionId: m.id })}>Demander un feedback</Button> : undefined}
       />
-      <Tabs label="Mission" className="mb-6" value={tab} onChange={setTab} items={[{ value: "apercu", label: "Aperçu" }, { value: "participants", label: "Participants", count: participants.length }, { value: "feedbacks", label: "Feedbacks" }, ...(can("clientlink.manage") || m.leadId === me.id ? [{ value: "client" as const, label: "Feedback client" }] : []), ...(canEdit ? [{ value: "parametres" as const, label: "Paramètres" }] : [])]} />
+      <Tabs label="Mission" className="mb-6" value={tab} onChange={setTab} items={[{ value: "apercu", label: "Aperçu" }, { value: "participants", label: "Participants", count: participants.length }, { value: "feedbacks", label: "Feedbacks" }, ...(isParticipant || m.leadId === me.id ? [{ value: "mesfeedbacks" as const, label: "Mes feedbacks" }] : []), ...(can("clientlink.manage") && (isParticipant || m.leadId === me.id) ? [{ value: "client" as const, label: "Feedback client" }] : []), ...(canEdit ? [{ value: "parametres" as const, label: "Paramètres" }] : [])]} />
 
       {tab === "apercu" && (
         <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
@@ -153,17 +155,31 @@ export default function MissionPage({ params }: PageProps<"/app/missions/[id]">)
         </Card>
       )}
 
+      {tab === "mesfeedbacks" && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-text-secondary">Les retours que vous avez reçus sur cette mission (« Mes missions, mes feedbacks »).</p>
+          {mine.length === 0 ? (
+            <Card><EmptyState icon={Link2} title="Aucun feedback reçu sur cette mission" description="Demandez un retour aux personnes avec qui vous avez travaillé." action={<Button disabled={readOnly} onClick={() => shell.openRequest({ missionId: m.id })}>Demander un feedback</Button>} className="py-8" /></Card>
+          ) : (
+            mine.map((f) => <FeedbackCard key={f.id} f={f} />)
+          )}
+        </div>
+      )}
+
       {tab === "client" && (
         <Card>
-          <CardHeader title="Retours clients" description="Un lien web permet au client de répondre sans compte." action={can("clientlink.manage") ? <Button size="sm" icon={<Link2 className="size-4" />} onClick={() => router.push(`/app/feedback-client?nouveau=1&mission=${m.id}`)}>Créer un lien</Button> : undefined} />
-          {links.length === 0 ? <EmptyState icon={Link2} title="Aucun lien pour cette mission" className="py-8" /> : (
+          <CardHeader title="Retours clients" description="Un lien par client : vous le créez et vous l’envoyez vous-même." action={<Button size="sm" icon={<Link2 className="size-4" />} onClick={() => router.push(`/app/feedback-client?nouveau=1&mission=${m.id}`)}>Créer un lien</Button>} />
+          {links.length === 0 ? <EmptyState icon={Link2} title="Aucun lien pour cette mission" description="Créez un lien pour un client précis (nom, entreprise, e-mail)." className="py-8" /> : (
             <ul className="divide-y divide-border">
-              {links.map((l) => (
-                <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div><p className="text-base font-medium text-ink">{l.title}</p><p className="text-sm text-text-secondary">{responses.filter((r) => r.linkId === l.id).length} / {l.maxResponses} réponses · expire {relDate(s.now, l.expiresAt)}</p></div>
-                  <div className="flex items-center gap-3"><StatusPill status={clientLinkValidity(l, s.clientResponses, s.now) === "OK" ? "ACTIF" : l.status === "DESACTIVE" ? "DESACTIVE" : "EXPIRE"} />{can("clientlink.manage") && <Button size="sm" variant="secondary" onClick={() => router.push(`/app/feedback-client?link=${l.id}`)}>Voir les réponses</Button>}</div>
-                </li>
-              ))}
+              {links.map((l) => {
+                const v = clientLinkValidity(l, s.clientResponses, s.now);
+                return (
+                  <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div><p className="text-base font-medium text-ink">{l.clientName} <span className="font-normal text-text-muted">· {l.company}</span></p><p className="text-sm text-text-secondary">{v === "MAX_ATTEINT" ? "A répondu" : v === "OK" ? `En attente · expire ${relDate(s.now, l.expiresAt)}` : v === "EXPIRE" ? "Lien expiré" : "Lien désactivé"}</p></div>
+                    <div className="flex items-center gap-3"><StatusPill status={v === "OK" ? "ACTIF" : v === "MAX_ATTEINT" ? "TRAITEE" : v === "DESACTIVE" ? "DESACTIVE" : "EXPIRE"} label={v === "MAX_ATTEINT" ? "Répondu" : undefined} /><Button size="sm" variant="secondary" onClick={() => router.push(`/app/feedback-client?link=${l.id}`)}>{v === "MAX_ATTEINT" ? "Voir la réponse" : "Gérer"}</Button></div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>

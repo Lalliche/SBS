@@ -3,6 +3,7 @@ import { useSession } from "@/lib/store/hooks";
 import { fmtDateLong } from "@/lib/store/engine";
 import { Callout, PageHeader, Skeleton } from "@/components/ui/Surface";
 import { Button } from "@/components/ui/Button";
+import { useShell } from "@/components/app/ShellContext";
 import { useFirstLoad } from "@/components/app/useSkeleton";
 import { CollabTasks, GiveCard, LatestReceived, QuotaCard, RecentMissions } from "@/components/app/home/Collab";
 import { RecentTeamFeedback, SynthesesToWrite, TeamOverview } from "@/components/app/home/Team";
@@ -16,6 +17,7 @@ function greeting(role: string, name: string, tasks: string) {
 export default function AccueilPage() {
   const { s, me } = useSession();
   const loading = useFirstLoad();
+  const shell = useShell();
   if (!me) return null;
   const desc: Record<string, string> = {
     COLLABORATEUR: `Nous sommes le ${fmtDateLong(s.now)}. Voici où vous en êtes sur ce cycle.`,
@@ -37,7 +39,18 @@ export default function AccueilPage() {
     );
   return (
     <div>
-      <PageHeader title={g.title} description={g.description} />
+      <PageHeader
+        title={g.title}
+        description={g.description}
+        actions={
+          me.role === "RESPONSABLE" ? (
+            <>
+              <Button variant="secondary" href="/app/feedback-client">Retours client</Button>
+              <Button onClick={shell.openMission}>Nouvelle mission</Button>
+            </>
+          ) : undefined
+        }
+      />
       {me.role === "ADMIN_RH" && <RhHome />}
       {me.role === "ADMIN_TECH" && <TechHome />}
       {(me.role === "COLLABORATEUR" || me.role === "RESPONSABLE") && (

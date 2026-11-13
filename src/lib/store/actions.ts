@@ -149,8 +149,10 @@ export function createRequest(s: AppState, requesterId: string, input: { mission
   const requester = userOf(s, requesterId)!;
   for (const r of input.recipientIds) {
     s.tasks.push({ id: nid("tk", s), giverId: r, requestId: id, status: "EN_ATTENTE" });
-    notify(s, r, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback sur « ${mission?.name ?? "une mission"} ».`, "/app/demandes");
+    notify(s, r, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback sur « ${mission?.name ?? "une mission"} ». Elle vous est aussi envoyée par e-mail.`, "/app/demandes");
   }
+  // CDC 3.5: the request is nominative and also reaches the recipient by e-mail.
+  s.emailSends.unshift({ id: nid("es", s), ts: s.now, templateId: "t-demande", recipients: input.recipientIds.length, delivered: input.recipientIds.length, opened: 0, audience: `Demande de ${fullName(requester)}` });
   return id;
 }
 export function declineTask(s: AppState, giverId: string, requestId: string, reason?: string) {
@@ -333,7 +335,7 @@ export function reopenSynthesis(s: AppState, userId: string, cycleId: string) {
 export function createCycle(s: AppState, actorId: string, name: string, startDate: string, endDate: string) {
   const rules = openCycle(s)?.reminderRules.map((r) => ({ ...r, lastRun: null })) ?? [];
   const id = nid("cy", s);
-  s.cycles.push({ id, name, startDate, endDate, status: new Date(startDate) > new Date(s.now) ? "A_VENIR" : "OUVERT", quotaRule: { ...s.settings.quotas }, reminderRules: rules, aiMode: "ASSISTE" });
+  s.cycles.push({ id, name, startDate, endDate, status: new Date(startDate) > new Date(s.now) ? "A_VENIR" : "OUVERT", quotaRule: { ...s.settings.quotas }, reminderRules: rules, aiMode: "MANUEL" });
   logAdmin(s, actorId, "Cycles", "Cycle créé", name);
   return id;
 }
@@ -478,13 +480,26 @@ export function advanceTime(s: AppState, days: number | "FIN_DE_CYCLE") {
   return archived;
 }
 
-/* ---------- Client links ---------- */
-export function createClientLink(s: AppState, actorId: string, l: Omit<ClientLink, "id" | "token" | "createdAt" | "status"> & { active: boolean }) {
+/* ---------- Client links (one link per client) ---------- */
+export interface ClientLinkInput {
+  missionId: string;
+  clientName: string;
+  company: string;
+  clientEmail: string;
+  title: string;
+  welcome: string;
+  questionIds: string[];
+  expiresAt: string;
+  maxResponses: number;
+  active: boolean;
+}
+export function createClientLink(s: AppState, actorId: string, l: ClientLinkInput) {
   const { active, ...rest } = l;
-  const token = `${(s.missions.find((m) => m.id === l.missionId)?.name ?? "mission").toLowerCase().normalize("NFD").replace(/[^a-z]/g, "").slice(0, 6)}-${hashString(s.now + s.clientLinks.length).toString(36).slice(0, 4)}`;
-  const link: ClientLink = { ...rest, id: nid("cl", s), token, createdAt: s.now, status: active ? "ACTIF" : "DESACTIVE" };
+  const slug = (s.missions.find((m) => m.id === l.missionId)?.name ?? "mission").toLowerCase().normalize("NFD").replace(/[^a-z]/g, "").slice(0, 6);
+  const token = `${slug}-${hashString(s.now + l.clientEmail + s.clientLinks.length).toString(36).slice(0, 4)}`;
+  const link: ClientLink = { ...rest, id: nid("cl", s), token, createdById: actorId, createdAt: s.now, status: active ? "ACTIF" : "DESACTIVE" };
   s.clientLinks.push(link);
-  logAdmin(s, actorId, "Liens client", "Lien client créé", link.title);
+  logAdmin(s, actorId, "Liens client", "Lien client créé", `${link.clientName} · ${link.company}`);
   return link;
 }
 export function setLinkStatus(s: AppState, actorId: string, id: string, status: "ACTIF" | "DESACTIVE") {
@@ -492,28 +507,39 @@ export function setLinkStatus(s: AppState, actorId: string, id: string, status: 
   if (!l) return;
   l.status = status;
   if (status === "ACTIF" && new Date(l.expiresAt) <= new Date(s.now)) l.expiresAt = addDays(s.now, 14);
-  logAdmin(s, actorId, "Liens client", status === "ACTIF" ? "Lien client réactivé" : "Lien client désactivé", l.title);
+  logAdmin(s, actorId, "Liens client", status === "ACTIF" ? "Lien client réactivé" : "Lien client désactivé", l.clientName);
 }
 export function extendLink(s: AppState, actorId: string, id: string, days: number) {
   const l = s.clientLinks.find((x) => x.id === id);
   if (!l) return;
   l.expiresAt = addDays(new Date(l.expiresAt) > new Date(s.now) ? l.expiresAt : s.now, days);
   if (l.status === "EXPIRE") l.status = "ACTIF";
-  logAdmin(s, actorId, "Liens client", "Lien client prolongé", l.title);
+  logAdmin(s, actorId, "Liens client", "Lien client prolongé", l.clientName);
 }
-export function duplicateLink(s: AppState, actorId: string, id: string) {
+/** Reminder e-mail to the client who has not answered yet (CDC 3.7 « relance du client »). */
+export function remindClient(s: AppState, actorId: string, id: string) {
   const l = s.clientLinks.find((x) => x.id === id);
   if (!l) return;
-  return createClientLink(s, actorId, { missionId: l.missionId, title: `${l.title} (copie)`, welcome: l.welcome, questionIds: [...l.questionIds], expiresAt: addDays(s.now, 30), maxResponses: l.maxResponses, identification: l.identification, active: true });
+  s.emailSends.unshift({ id: nid("es", s), ts: s.now, templateId: "t-client", recipients: 1, delivered: 1, opened: 0, audience: `Relance client — ${l.clientName}` });
+  logAdmin(s, actorId, "Liens client", "Client relancé", l.clientName);
 }
-export function submitClientResponse(s: AppState, token: string, input: { clientName?: string; company?: string; answers: Record<string, string>; rating?: number }) {
+export function sendClientLinkEmail(s: AppState, actorId: string, id: string, to: string[]) {
+  const l = s.clientLinks.find((x) => x.id === id);
+  if (!l) return;
+  s.emailSends.unshift({ id: nid("es", s), ts: s.now, templateId: "t-client", recipients: to.length, delivered: to.length, opened: 0, audience: `Lien client — ${l.clientName}` });
+}
+/** The client is identified by the link itself: no identification input (CDC 3.7). Returns false if the link cannot take an answer. */
+export function submitClientResponse(s: AppState, token: string, input: { answers: Record<string, string>; rating?: number }) {
   const l = s.clientLinks.find((x) => x.token === token);
   if (!l) return false;
-  s.clientResponses.push({ id: nid("cr", s), linkId: l.id, missionId: l.missionId, clientName: input.clientName || undefined, company: input.company || undefined, answers: input.answers, rating: input.rating, createdAt: s.now });
+  if (s.clientResponses.filter((r) => r.linkId === l.id).length >= l.maxResponses) return false;
+  s.clientResponses.push({ id: nid("cr", s), linkId: l.id, missionId: l.missionId, clientName: l.clientName, company: l.company, answers: input.answers, rating: input.rating, createdAt: s.now });
   s.clientDevices.push(l.id);
   const mission = s.missions.find((m) => m.id === l.missionId);
-  notifyRole(s, "ADMIN_RH", "CLIENT", "Nouveau retour client", `Une réponse a été reçue pour « ${mission?.name ?? l.title} ».`, "/app/feedback-client");
-  if (mission) notify(s, mission.leadId, "CLIENT", "Nouveau retour client", `Une réponse a été reçue pour « ${mission.name} ».`, `/app/missions/${mission.id}`);
+  const title = "Retour client reçu";
+  const body = `${l.clientName} (${l.company}) a répondu pour « ${mission?.name ?? l.title} ».`;
+  const targets = new Set([l.createdById, mission?.leadId].filter(Boolean) as string[]);
+  targets.forEach((id) => notify(s, id, "CLIENT", title, body, "/app/feedback-client"));
   return true;
 }
 
