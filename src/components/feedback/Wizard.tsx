@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { dur, ease, spring } from "@/lib/motion-tokens";
 import { act } from "@/lib/store/store";
 import { clearDraft, completeTaskAnonymously, emptyDraft, giveAnonymous, giveNamed, openCycle, saveDraft } from "@/lib/store/actions";
-import { fmtDate, fullName, gradeBand, questionText, relationLabel, relationOf } from "@/lib/store/engine";
+import { fmtDate, fullName, gradeBand, questionText, relationLabel, suggestedRelation } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
 import type { Draft, Relation } from "@/lib/store/types";
 import { Avatar, AnonymousBadge } from "@/components/ui/Avatar";
@@ -84,12 +84,13 @@ export function Wizard() {
   }, [me, done, cycle.id]);
 
   const recipient = s.users.find((u) => u.id === draft.recipientId) ?? null;
-  const relation: Relation | null = me && recipient ? relationOf(me, recipient) : null;
-  const [manualRel, setManualRel] = useState<Relation>("PAIR");
-  const effRelation: Relation = relation ?? manualRel;
+  // Proposed from the reporting line, else from the grades; the giver can correct it (post-contract, PwC reference).
+  const proposed: Relation = me && recipient ? suggestedRelation(me, recipient) ?? "PAIR" : "PAIR";
+  const [relOverride, setRelOverride] = useState<Relation | "">("");
+  const effRelation: Relation = relOverride || proposed;
   const band = recipient ? gradeBand(recipient.grade) : "CONFIRME";
   const mission = s.missions.find((m) => m.id === draft.missionId) ?? null;
-  const questions = useMemo(() => s.questions.filter((q) => q.kind === "COLLAB" && q.active).sort((a, b) => a.order - b.order), [s.questions]);
+  const questions = s.questions.filter((q) => q.kind === "COLLAB" && q.active && (!q.appliesTo || q.appliesTo.includes(effRelation))).sort((a, b) => a.order - b.order);
   const answered = questions.filter((q) => draft.answers[q.id]?.trim()).length;
   const anonAllowed = request ? request.allowAnonymous : s.settings.visibility.allowAnonymousOnRequest || !request;
   const staleDraft = !!draft.cycleId && draft.cycleId !== cycle.id && !!me && !!s.drafts[me.id];
@@ -137,7 +138,8 @@ export function Wizard() {
     setSending(true);
     setTimeout(() => {
       const ratings = Object.fromEntries(Object.entries(draft.ratings).filter(([, v]) => v >= 1 && v <= 5));
-      const answers = Object.fromEntries(Object.entries(draft.answers).filter(([, v]) => v.trim()));
+      const askedIds = new Set(questions.map((q) => q.id));
+      const answers = Object.fromEntries(Object.entries(draft.answers).filter(([k, v]) => askedIds.has(k) && v.trim()));
       if (draft.type === "NOMINATIF") {
         act((d) => giveNamed(d, { authorId: me.id, recipientId: recipient.id, missionId: draft.missionId, relation: effRelation, requestId: draft.requestId ?? undefined, answers, ratings }));
       } else {
@@ -229,13 +231,13 @@ export function Wizard() {
                       <p className="mt-1 text-sm text-text-secondary">Il porte sur la contribution de la personne à une mission, pas sur la mission elle-même.</p>
                     </div>
                     {request ? (
-                      <Callout tone="info" title={`Réponse à la demande de ${recipient ? fullName(recipient) : "…"}`}>Mission : {mission?.name}. Échéance : {fmtDate(request.dueDate)}.</Callout>
+                      <Callout tone="info" title={`Réponse à la demande de ${recipient ? fullName(recipient) : "…"}`}>{mission ? `Mission : ${mission.name}. ` : "Sans mission. "}Échéance : {fmtDate(request.dueDate)}.{request.role && <span className="mt-1 block">Rôle du demandeur : {request.role}{request.hours ? ` (${request.hours} h passées)` : ""}</span>}</Callout>
                     ) : (
-                      <PeoplePicker multi={false} users={s.users.filter((u) => u.status === "ACTIF" && u.id !== me.id && u.role !== "ADMIN_TECH")} departments={s.departments} selected={draft.recipientId ? [draft.recipientId] : []} onChange={(ids) => patch({ recipientId: ids[0], missionId: null })} relationFor={(u) => relationOf(me, u)} />
+                      <PeoplePicker multi={false} users={s.users.filter((u) => u.status === "ACTIF" && u.id !== me.id && u.role !== "ADMIN_TECH")} departments={s.departments} selected={draft.recipientId ? [draft.recipientId] : []} onChange={(ids) => { setRelOverride(""); patch({ recipientId: ids[0], missionId: null }); }} relationFor={(u) => suggestedRelation(me, u)} />
                     )}
                     {recipient && (
                       <div className="flex flex-col gap-4">
-                        {!relation && <SelectInput label="Votre relation avec cette personne" value={manualRel} onChange={setManualRel} options={[{ value: "PAIR", label: "Pair" }, { value: "RESPONSABLE", label: "Responsable" }, { value: "EQUIPE", label: "Équipe" }]} hint="Elle ne peut pas être déduite automatiquement." />}
+                        <SelectInput<Relation | "AUTO"> label="Nature de ce feedback" value={relOverride || "AUTO"} onChange={(v) => setRelOverride(v === "AUTO" ? "" : v)} options={[{ value: "AUTO", label: `Garder la nature proposée (${{ RESPONSABLE: "personne plus junior que moi", PAIR: "pair", EQUIPE: "personne plus senior que moi" }[proposed]})` }, { value: "PAIR", label: "Cette personne est un pair" }, { value: "RESPONSABLE", label: "Cette personne est plus junior que moi" }, { value: "EQUIPE", label: "Cette personne est plus senior que moi" }]} hint="Proposée d’après la hiérarchie et les grades. Corrigez-la si votre relation de travail est différente." />
                         {!request && (
                           <SelectInput label="Mission" value={draft.missionId ?? ""} onChange={(v) => patch({ missionId: v || null })} placeholder="Choisir une mission" options={[...shared.map((m) => ({ value: m.id, label: m.name })), ...(s.settings.visibility.feedbackWithoutMission ? [{ value: "", label: "Aucune mission" }] : [])]} hint={shared.length ? `${shared.length} mission${shared.length > 1 ? "s" : ""} en commun suggérée${shared.length > 1 ? "s" : ""}.` : "Aucune mission en commun."} />
                         )}
@@ -303,7 +305,7 @@ export function Wizard() {
                     </div>
                     {(layout === "all" ? questions : [questions[qi]]).map((q) => (
                       <div key={q.id} className="flex flex-col gap-2">
-                        <Badge tone="neutral" className="self-start">{s.competencies.find((c) => c.id === q.competencyId)?.name ?? "Commentaire libre"}</Badge>
+                        <Badge tone="neutral" className="self-start">{s.competencies.find((c) => c.id === q.competencyId)?.name ?? q.topic ?? "Commentaire libre"}</Badge>
                         <p className="text-md font-medium leading-snug text-ink text-pretty">{questionText(q, effRelation, band)}</p>
                         <TextArea label="" value={draft.answers[q.id] ?? ""} onChange={(v) => patch({ answers: { ...draft.answers, [q.id]: v } })} rows={layout === "all" ? 3 : 6} max={1200} placeholder="Décrivez une situation observée…" />
                       </div>
@@ -353,7 +355,7 @@ export function Wizard() {
                         {questions.map((q) => (
                           <li key={q.id} className="flex items-start gap-4 px-4 py-3">
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-muted">{s.competencies.find((c) => c.id === q.competencyId)?.name ?? "Commentaire libre"}</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-muted">{s.competencies.find((c) => c.id === q.competencyId)?.name ?? q.topic ?? "Commentaire libre"}</p>
                               <p className={cn("mt-0.5 text-sm text-text-secondary text-pretty", !draft.answers[q.id]?.trim() && "italic text-text-muted")}>{draft.answers[q.id]?.trim() || "Pas de réponse"}</p>
                             </div>
                             <button type="button" onClick={() => { setQi(questions.indexOf(q)); go(2); }} className="shrink-0 text-sm font-medium text-ink underline underline-offset-2 hover:text-accent">Modifier</button>

@@ -28,20 +28,27 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [file, setFile] = useState<string | null>(null);
+  // Hierarchy: the "responsable" column holds the matricule of the manager (resolved against the directory).
+  const leaders = s.users.filter((u) => u.status === "ACTIF" && s.users.some((x) => x.leaderIds.includes(u.id)));
+  const lead = (i: number) => leaders[i % Math.max(1, leaders.length)];
   const rows = [
-    { m: "SBS-2101", n: "Amira Boukhari", e: "amira.boukhari@sbsfirm.example", d: "Strategy & Consulting", ok: true, note: "" },
-    { m: "SBS-2102", n: "Walid Ouali", e: "walid.ouali@sbsfirm.example", d: "Engineering & Tech", ok: true, note: "" },
-    { m: "SBS-1007", n: "Karim Doublon", e: "k.doublon@sbsfirm.example", d: "Finance & Operations", ok: false, note: "Matricule déjà utilisé (SBS-1007)" },
-    { m: "SBS-2104", n: "Sofiane Kaci", e: "sofiane.kaci@sbsfirm.example", d: "People & HR", ok: false, note: "Responsable inconnu" },
-    { m: "SBS-2105", n: "Yasmine Belkacem", e: "yasmine.belkacem@sbsfirm.example", d: "Strategy & Consulting", ok: true, note: "" },
+    { m: "SBS-2101", n: "Amira Boukhari", e: "amira.boukhari@sbsfirm.example", d: "Strategy & Consulting", r: lead(0)?.matricule ?? "", ok: true, note: "" },
+    { m: "SBS-2102", n: "Walid Ouali", e: "walid.ouali@sbsfirm.example", d: "Engineering & Tech", r: lead(1)?.matricule ?? "", ok: true, note: "" },
+    { m: "SBS-1007", n: "Karim Doublon", e: "k.doublon@sbsfirm.example", d: "Finance & Operations", r: lead(2)?.matricule ?? "", ok: false, note: "Matricule déjà utilisé (SBS-1007)" },
+    { m: "SBS-2104", n: "Sofiane Kaci", e: "sofiane.kaci@sbsfirm.example", d: "People & HR", r: "SBS-9999", ok: false, note: "Responsable inconnu (SBS-9999)" },
+    { m: "SBS-2105", n: "Yasmine Belkacem", e: "yasmine.belkacem@sbsfirm.example", d: "Strategy & Consulting", r: "", ok: true, note: "" },
   ];
   const [fixed, setFixed] = useState<Record<string, boolean>>({});
   const good = rows.filter((r) => r.ok || fixed[r.m]);
+  // A row fixed after an unknown manager is attached to the first known leader; a row without manager stays without one.
+  const leaderOf = (r: (typeof rows)[number]) => s.users.find((u) => u.matricule === r.r) ?? (fixed[r.m] && !s.users.some((u) => u.matricule === r.r) && r.r ? lead(2) : undefined);
+  const withLeader = good.filter((r) => leaderOf(r)).length;
   const run = () => {
     good.forEach((r) => {
       const [first, ...rest] = r.n.split(" ");
       const dept = s.departments.find((d) => d.name === r.d)!;
-      act((d) => addUser(d, me!.id, { matricule: r.m, firstName: first, lastName: rest.join(" "), email: r.e, departmentId: dept.id, jobTitle: "Consultant", grade: "Consultant", leaderIds: [] }));
+      const l = leaderOf(r);
+      act((d) => addUser(d, me!.id, { matricule: r.m, firstName: first, lastName: rest.join(" "), email: r.e, departmentId: dept.id, jobTitle: "Consultant", grade: "Consultant", leaderIds: l ? [l.id] : [] }));
     });
     setStep(3);
   };
@@ -52,9 +59,9 @@ function ImportWizard({ onClose }: { onClose: () => void }) {
         <ol className="mb-6 flex flex-wrap gap-2">{["Fichier", "Colonnes", "Validation", "Résultat"].map((t, i) => <li key={t} className={cn("flex items-center gap-2 rounded-full px-3 py-1.5 text-sm", i === step ? "bg-ink text-white" : i < step ? "bg-paper text-ink" : "text-text-muted")}>{i < step ? <Check className="size-3.5" /> : <span className="tabular-nums">{i + 1}</span>}{t}</li>)}</ol>
         <div className="rounded-xl border border-border bg-bg p-6 sm:p-8">
           {step === 0 && <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border-strong p-10 text-center"><FileUp className="size-8 text-text-muted" /><p className="text-md font-medium text-ink">{file ?? "Déposez un fichier Excel ou CSV"}</p><div className="flex gap-2"><Button onClick={() => setFile("collaborateurs-sbs.xlsx")}>{file ? "Remplacer le fichier" : "Choisir un fichier"}</Button><Button variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "Modèle téléchargé" })}>Télécharger le modèle</Button></div></div>}
-          {step === 1 && <div className="flex flex-col gap-3"><p className="text-sm text-text-secondary">Associez les colonnes de votre fichier aux champs de la plateforme.</p>{[["Matricule", "matricule"], ["Nom complet", "nom"], ["E-mail", "email"], ["Département", "departement"], ["Responsable", "responsable"]].map(([l, c]) => <div key={l} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border border-border px-4 py-2.5 text-base"><span>{l}</span><span className="text-text-muted">→</span><span className="rounded bg-paper px-2 py-1 text-sm font-medium">{c}</span></div>)}</div>}
-          {step === 2 && <div className="flex flex-col gap-3"><p className="text-sm text-text-secondary">{good.length} ligne(s) valides, {rows.length - good.length} à corriger.</p><ul className="divide-y divide-border rounded-lg border border-border">{rows.map((r) => { const ok = r.ok || fixed[r.m]; return <li key={r.m} className="flex items-center gap-3 px-4 py-3"><span className={cn("flex size-5 items-center justify-center rounded-full", ok ? "bg-success text-white" : "bg-danger-bg text-danger")}>{ok ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" />}</span><span className="w-24 text-sm tabular-nums text-text-muted">{r.m}</span><span className="flex-1 text-base text-ink">{r.n}<span className="block text-xs text-text-muted">{r.d}</span></span>{!ok && <><span className="text-sm text-danger">{r.note}</span><Button size="sm" variant="secondary" onClick={() => setFixed({ ...fixed, [r.m]: true })}>Corriger</Button></>}</li>; })}</ul></div>}
-          {step === 3 && <div className="flex flex-col items-center gap-3 py-6 text-center"><span className="flex size-12 items-center justify-center rounded-full bg-success-bg text-success"><Check className="size-6" /></span><p className="text-lg font-semibold text-ink">{good.length} collaborateurs importés</p><p className="text-sm text-text-secondary">{rows.length - good.length} ligne(s) ignorée(s). Un rapport d’erreurs est disponible.</p><Button variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "Rapport d’erreurs téléchargé" })}>Rapport d’erreurs</Button></div>}
+          {step === 1 && <div className="flex flex-col gap-3"><p className="text-sm text-text-secondary">Associez les colonnes de votre fichier aux champs de la plateforme.</p>{[["Matricule", "matricule"], ["Nom complet", "nom"], ["E-mail", "email"], ["Département", "departement"], ["Responsable (matricule du responsable)", "responsable"]].map(([l, c]) => <div key={l} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border border-border px-4 py-2.5 text-base"><span>{l}</span><span className="text-text-muted">→</span><span className="rounded bg-paper px-2 py-1 text-sm font-medium">{c}</span></div>)}</div>}
+          {step === 2 && <div className="flex flex-col gap-3"><p className="text-sm text-text-secondary">{good.length} ligne(s) valides, {rows.length - good.length} à corriger.</p><ul className="divide-y divide-border rounded-lg border border-border">{rows.map((r) => { const ok = r.ok || fixed[r.m]; return <li key={r.m} className="flex items-center gap-3 px-4 py-3"><span className={cn("flex size-5 items-center justify-center rounded-full", ok ? "bg-success text-white" : "bg-danger-bg text-danger")}>{ok ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" />}</span><span className="w-24 text-sm tabular-nums text-text-muted">{r.m}</span><span className="flex-1 text-base text-ink">{r.n}<span className="block text-xs text-text-muted">{r.d} · {r.r ? `responsable ${r.r}` : "sans responsable"}</span></span>{!ok && <><span className="text-sm text-danger">{r.note}</span><Button size="sm" variant="secondary" onClick={() => setFixed({ ...fixed, [r.m]: true })}>Corriger</Button></>}</li>; })}</ul></div>}
+          {step === 3 && <div className="flex flex-col items-center gap-3 py-6 text-center"><span className="flex size-12 items-center justify-center rounded-full bg-success-bg text-success"><Check className="size-6" /></span><p className="text-lg font-semibold text-ink">{good.length} collaborateurs importés</p><p className="text-sm text-text-secondary">{withLeader} rattaché{withLeader > 1 ? "s" : ""} à un responsable{good.length - withLeader > 0 ? `, ${good.length - withLeader} sans responsable (à affecter ensuite)` : ""}. {rows.length - good.length} ligne(s) ignorée(s). Un rapport d’erreurs est disponible.</p><Button variant="secondary" icon={<Download className="size-4" />} onClick={() => toast({ title: "Rapport d’erreurs téléchargé" })}>Rapport d’erreurs</Button></div>}
           <div className="mt-8 flex items-center justify-between border-t border-border pt-5">
             {step < 3 ? <Button variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)}>Retour</Button> : <span />}
             {step === 0 && <Button disabled={!file} onClick={() => setStep(1)}>Continuer</Button>}
@@ -86,6 +93,7 @@ export default function CollaborateursPage() {
   const edit = can("referentials.edit");
   const rows = useMemo(() => s.users.filter((u) => (view === "actifs" ? u.status === "ACTIF" : view === "sans" ? !u.leaderIds.length && u.status === "ACTIF" : view === "resp" ? s.users.some((x) => x.leaderIds.includes(u.id)) : true) && (me?.role === "RESPONSABLE" ? u.leaderIds.includes(me.id) : true) && fullName(u).toLowerCase().includes(q.trim().toLowerCase())), [s.users, view, q, me]);
   if (!me) return null;
+  const withoutLeader = s.users.filter((u) => u.status === "ACTIF" && !u.leaderIds.length).length;
   const dup = s.users.find((u) => f.matricule && u.matricule.toLowerCase() === f.matricule.toLowerCase()) ?? s.users.find((u) => f.email && u.email.toLowerCase() === f.email.toLowerCase());
   const errs = { matricule: !f.matricule ? "Obligatoire" : null, firstName: !f.firstName ? "Obligatoire" : null, lastName: !f.lastName ? "Obligatoire" : null, email: !/.+@.+/.test(f.email) ? "E-mail invalide" : null, jobTitle: !f.jobTitle ? "Obligatoire" : null };
   const save = (again: boolean) => {
@@ -101,6 +109,11 @@ export default function CollaborateursPage() {
   return (
     <Guard action="users.directory">
       <PageHeader title="Collaborateurs" description={me.role === "RESPONSABLE" ? "Les membres de votre équipe." : "L’annuaire : poste, grade, département et responsable."} actions={edit ? <><Button variant="secondary" icon={<FileUp className="size-4" />} onClick={() => setImp(true)}>Importer</Button><Button icon={<UserPlus className="size-4" />} onClick={() => setAdd(true)}>Ajouter un collaborateur</Button></> : undefined} />
+      {edit && view !== "sans" && withoutLeader > 0 && (
+        <Callout tone="warning" className="mb-4" title={`${withoutLeader} collaborateur${withoutLeader > 1 ? "s" : ""} actif${withoutLeader > 1 ? "s" : ""} sans responsable`} action={<Button size="sm" variant="secondary" onClick={() => setView("sans")}>Voir la liste</Button>}>
+          Sans hiérarchie, la nature d’un feedback (descendant, pair, ascendant) est proposée d’après le grade. Affectez un responsable depuis la liste, ou importez la hiérarchie avec le fichier des collaborateurs.
+        </Callout>
+      )}
       <SavedViews value={view} onChange={setView} views={[{ value: "all", label: "Tous" }, { value: "actifs", label: "Actifs" }, { value: "sans", label: "Sans responsable" }, { value: "resp", label: "Responsables" }]} />
       <DataTable<User>
         caption="Annuaire des collaborateurs"
@@ -109,7 +122,7 @@ export default function CollaborateursPage() {
         selectable={edit}
         onRowClick={setProfile}
         toolbar={<SearchInput value={q} onChange={setQ} placeholder="Rechercher un collaborateur…" className="w-[20em]" />}
-        bulk={(sel, clear) => <><Button size="sm" variant="inverse" onClick={() => setLeaderFor(sel)}>Changer de responsable</Button><Button size="sm" variant="inverse" onClick={() => setDeact(sel)}>Désactiver</Button><Button size="sm" variant="inverse" onClick={() => { toast({ title: `${sel.length} ligne(s) exportée(s)` }); clear(); }}>Exporter</Button></>}
+        bulk={(sel, clear) => <><Button size="sm" variant="inverse" onClick={() => setLeaderFor(sel)}>Affecter un responsable</Button><Button size="sm" variant="inverse" onClick={() => setDeact(sel)}>Désactiver</Button><Button size="sm" variant="inverse" onClick={() => { toast({ title: `${sel.length} ligne(s) exportée(s)` }); clear(); }}>Exporter</Button></>}
         empty={<EmptyState icon={UserMinus} title="Aucun collaborateur ne correspond" />}
         columns={[
           { key: "n", header: "Collaborateur", sort: (a, b) => a.lastName.localeCompare(b.lastName), cell: (u) => <PersonChip user={u} dept={s.departments.find((d) => d.id === u.departmentId)} sub={u.email} /> },
@@ -121,7 +134,7 @@ export default function CollaborateursPage() {
         ]}
         rowActions={edit ? (u) => (
           <Popover label="Actions" trigger={({ toggle, ref }) => <IconButton ref={ref} label="Actions" size="sm" onClick={toggle}><MoreHorizontal className="size-4" /></IconButton>}>
-            {(close) => <div role="menu" className="min-w-[14em] py-1"><MenuItem onClick={() => { close(); setProfile(u); }}>Ouvrir le profil</MenuItem><MenuItem onClick={() => { close(); setLeaderFor([u]); }}>Changer de responsable</MenuItem>{u.status === "ACTIF" ? <MenuItem danger onClick={() => { close(); setDeact([u]); }}>Désactiver</MenuItem> : <MenuItem onClick={() => { close(); act((d) => setUserStatus(d, me.id, u.id, "ACTIF")); toast({ title: "Collaborateur réactivé" }); }}>Réactiver</MenuItem>}</div>}
+            {(close) => <div role="menu" className="min-w-[14em] py-1"><MenuItem onClick={() => { close(); setProfile(u); }}>Ouvrir le profil</MenuItem><MenuItem onClick={() => { close(); setLeaderFor([u]); }}>Affecter un responsable</MenuItem>{u.status === "ACTIF" ? <MenuItem danger onClick={() => { close(); setDeact([u]); }}>Désactiver</MenuItem> : <MenuItem onClick={() => { close(); act((d) => setUserStatus(d, me.id, u.id, "ACTIF")); toast({ title: "Collaborateur réactivé" }); }}>Réactiver</MenuItem>}</div>}
           </Popover>
         ) : undefined}
       />
@@ -144,7 +157,7 @@ export default function CollaborateursPage() {
           <SelectInput label="Département" required value={f.departmentId} onChange={(v) => setF({ ...f, departmentId: v })} options={s.departments.map((d) => ({ value: d.id, label: d.name }))} />
           <TextInput label="Poste" required value={f.jobTitle} onChange={(v) => setF({ ...f, jobTitle: v })} error={touched ? errs.jobTitle : null} />
           <SelectInput label="Grade" required value={f.grade} onChange={(v) => setF({ ...f, grade: v })} options={GRADES.map((g) => ({ value: g, label: g }))} />
-          <SelectInput label="Responsable" value={f.leader} onChange={(v) => setF({ ...f, leader: v })} placeholder="Aucun" options={[{ value: "", label: "Aucun" }, ...s.users.filter((u) => s.users.some((x) => x.leaderIds.includes(u.id)) || u.role === "RESPONSABLE").map((u) => ({ value: u.id, label: fullName(u) }))]} />
+          <SelectInput label="Responsable" value={f.leader} onChange={(v) => setF({ ...f, leader: v })} placeholder="Aucun" options={[{ value: "", label: "Aucun" }, ...s.users.filter((u) => u.status === "ACTIF").map((u) => ({ value: u.id, label: fullName(u) }))]} />
           {s.settings.visibility.multipleLeaders && <SelectInput label="Second responsable" value={multi} onChange={setMulti} options={[{ value: "", label: "Aucun" }, ...s.users.filter((u) => u.role === "RESPONSABLE").map((u) => ({ value: u.id, label: fullName(u) }))]} />}
           {dup && touched && <Callout tone="danger" title="Doublon détecté">Un collaborateur existe déjà avec ce matricule ou cet e-mail : {fullName(dup)}.</Callout>}
         </div>
@@ -153,7 +166,7 @@ export default function CollaborateursPage() {
       <Modal open={!!deact} onClose={() => setDeact(null)} title="Désactiver ces collaborateurs ?" footer={<><Button variant="ghost" onClick={() => setDeact(null)}>Annuler</Button><Button variant="danger" onClick={() => { const list = deact!; list.forEach((u) => act((d) => setUserStatus(d, me.id, u.id, "INACTIF"))); setDeact(null); toast({ title: `${list.length} désactivé${list.length > 1 ? "s" : ""}`, undo: () => list.forEach((u) => act((d) => setUserStatus(d, me.id, u.id, "ACTIF"))) }); }}>Désactiver</Button></>}>
         {deact && <><p className="text-base text-text">Impact :</p><ul className="mt-2 flex flex-col gap-1.5 text-sm text-text-secondary"><li>• {impact(deact).missions} mission(s) en cours concernée(s)</li><li>• {impact(deact).team} collaborateur(s) à réaffecter à un autre responsable</li><li>• L’historique des feedbacks est conservé</li></ul></>}
       </Modal>
-      <Modal open={!!leaderFor} onClose={() => setLeaderFor(null)} title="Changer de responsable" subtitle={`${leaderFor?.length ?? 0} collaborateur(s)`} footer={<><Button variant="ghost" onClick={() => setLeaderFor(null)}>Annuler</Button><Button disabled={!newLeader} onClick={() => { act((d) => setLeader(d, me.id, leaderFor!.map((u) => u.id), newLeader)); setLeaderFor(null); toast({ title: "Responsable modifié" }); }}>Appliquer</Button></>}>
+      <Modal open={!!leaderFor} onClose={() => setLeaderFor(null)} title="Affecter un responsable" subtitle={`${leaderFor?.length ?? 0} collaborateur(s)`} footer={<><Button variant="ghost" onClick={() => setLeaderFor(null)}>Annuler</Button><Button disabled={!newLeader} onClick={() => { act((d) => setLeader(d, me.id, leaderFor!.map((u) => u.id), newLeader)); setLeaderFor(null); toast({ title: "Responsable modifié" }); }}>Appliquer</Button></>}>
         <SelectInput label="Nouveau responsable" value={newLeader} onChange={setNewLeader} placeholder="Choisir" options={s.users.filter((u) => u.status === "ACTIF").map((u) => ({ value: u.id, label: fullName(u) }))} />
       </Modal>
     </Guard>

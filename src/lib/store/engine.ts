@@ -71,6 +71,23 @@ export function relationOf(giver: User, recipient: User): Relation | null {
 }
 export const relationLabel: Record<Relation, string> = { RESPONSABLE: "Responsable", PAIR: "Pair", EQUIPE: "Équipe" };
 
+const GRADE_RANK: Record<Grade, number> = { Junior: 0, Consultant: 1, Senior: 2, Manager: 3, Directeur: 4 };
+/**
+ * Proposed relation giver → recipient. The reporting line wins (RG-02); when there is
+ * none, the grades decide, so that anyone can give or ask feedback to anyone.
+ * The giver can always correct it in the wizard.
+ */
+export function suggestedRelation(giver: User, recipient: User): Relation | null {
+  if (giver.id === recipient.id) return null;
+  const byLine = relationOf(giver, recipient);
+  if (byLine) return byLine;
+  const d = GRADE_RANK[giver.grade] - GRADE_RANK[recipient.grade];
+  return d > 0 ? "RESPONSABLE" : d < 0 ? "EQUIPE" : "PAIR";
+}
+/** Direction of the feedback as the recipient lives it: from above, from a peer, from below. */
+export const directionLabel: Record<Relation, string> = { RESPONSABLE: "Descendant", PAIR: "Pair", EQUIPE: "Ascendant" };
+export const directionHint: Record<Relation, string> = { RESPONSABLE: "De quelqu’un de plus senior", PAIR: "D’un pair", EQUIPE: "De quelqu’un de plus junior" };
+
 /* ---------------- Averages (RG-04 / RG-05 / RG-06) ---------------- */
 
 interface Rated {

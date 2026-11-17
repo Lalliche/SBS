@@ -141,15 +141,15 @@ export function hideFeedback(s: AppState, actorId: string, id: string, hidden: b
 }
 
 /* ---------- Requests ---------- */
-export function createRequest(s: AppState, requesterId: string, input: { missionId: string; recipientIds: string[]; message: string; dueDate: string; allowAnonymous: boolean }) {
+export function createRequest(s: AppState, requesterId: string, input: { missionId: string | null; role?: string; hours?: number; recipientIds: string[]; message: string; dueDate: string; allowAnonymous: boolean }) {
   const cycle = openCycle(s);
   const mission = s.missions.find((m) => m.id === input.missionId);
   const id = nid("rq", s);
-  s.requests.push({ id, cycleId: cycle.id, missionId: input.missionId, requesterId, recipientIds: input.recipientIds, message: input.message, createdAt: s.now, dueDate: input.dueDate, allowAnonymous: input.allowAnonymous, anonymousReplies: 0 });
+  s.requests.push({ id, cycleId: cycle.id, missionId: input.missionId, role: input.role?.trim() || undefined, hours: input.hours && input.hours > 0 ? input.hours : undefined, requesterId, recipientIds: input.recipientIds, message: input.message, createdAt: s.now, dueDate: input.dueDate, allowAnonymous: input.allowAnonymous, anonymousReplies: 0 });
   const requester = userOf(s, requesterId)!;
   for (const r of input.recipientIds) {
     s.tasks.push({ id: nid("tk", s), giverId: r, requestId: id, status: "EN_ATTENTE" });
-    notify(s, r, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback sur « ${mission?.name ?? "une mission"} ». Elle vous est aussi envoyée par e-mail.`, "/app/demandes");
+    notify(s, r, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback${mission ? ` sur « ${mission.name} »` : ""}. Elle vous est aussi envoyée par e-mail.`, "/app/demandes");
   }
   // CDC 3.5: the request is nominative and also reaches the recipient by e-mail.
   s.emailSends.unshift({ id: nid("es", s), ts: s.now, templateId: "t-demande", recipients: input.recipientIds.length, delivered: input.recipientIds.length, opened: 0, audience: `Demande de ${fullName(requester)}` });
@@ -163,12 +163,37 @@ export function declineTask(s: AppState, giverId: string, requestId: string, rea
   const r = s.requests.find((x) => x.id === requestId);
   if (r) notify(s, r.requesterId, "DEMANDE", "Une demande a été déclinée", "Une personne sollicitée ne peut pas répondre à votre demande.", "/app/demandes");
 }
+/**
+ * Post-contract change: the evaluator sends the request back (wrong person, or the request is
+ * badly filled). Unlike a decline, the requester is told who and why, and can correct and resend.
+ */
+export function returnTask(s: AppState, giverId: string, requestId: string, reason: string) {
+  const t = s.tasks.find((x) => x.giverId === giverId && x.requestId === requestId && x.status === "EN_ATTENTE");
+  const r = s.requests.find((x) => x.id === requestId);
+  if (!t || !r) return;
+  t.status = "RETOURNEE";
+  t.reason = reason.trim();
+  const giver = userOf(s, giverId);
+  notify(s, r.requesterId, "DEMANDE", "Une demande vous a été retournée", `${giver ? fullName(giver) : "Une personne"} vous la retourne : « ${t.reason} ». Corrigez-la puis renvoyez-la.`, "/app/demandes?tab=envoyees");
+}
+/** The requester fixes a returned request (role, message) and sends it again to the same person. */
+export function resendTask(s: AppState, requesterId: string, requestId: string, giverId: string, patch: { role?: string; message?: string }) {
+  const r = s.requests.find((x) => x.id === requestId && x.requesterId === requesterId);
+  const t = s.tasks.find((x) => x.giverId === giverId && x.requestId === requestId && x.status === "RETOURNEE");
+  if (!r || !t) return;
+  if (patch.role !== undefined) r.role = patch.role.trim() || undefined;
+  if (patch.message !== undefined) r.message = patch.message.trim();
+  t.status = "EN_ATTENTE";
+  t.reason = undefined;
+  const requester = userOf(s, requesterId);
+  notify(s, giverId, "DEMANDE", "Demande de feedback corrigée", `${requester ? fullName(requester) : "Le demandeur"} a corrigé sa demande et vous la renvoie.`, "/app/demandes");
+}
 export function remindRequest(s: AppState, requestId: string) {
   const r = s.requests.find((x) => x.id === requestId);
   if (!r) return 0;
   const pending = s.tasks.filter((t) => t.requestId === requestId && t.status === "EN_ATTENTE");
   const mission = s.missions.find((m) => m.id === r.missionId);
-  pending.forEach((t) => notify(s, t.giverId, "RAPPEL", "Rappel : un feedback vous attend", `Demande sur « ${mission?.name ?? "mission"} », à traiter avant le ${fmtDate(r.dueDate)}.`, "/app/demandes"));
+  pending.forEach((t) => notify(s, t.giverId, "RAPPEL", "Rappel : un feedback vous attend", `Demande${mission ? ` sur « ${mission.name} »` : ""}, à traiter avant le ${fmtDate(r.dueDate)}.`, "/app/demandes"));
   return pending.length;
 }
 export function addRecipientsToRequest(s: AppState, requestId: string, ids: string[]) {
@@ -180,7 +205,7 @@ export function addRecipientsToRequest(s: AppState, requestId: string, ids: stri
     if (r.recipientIds.includes(id)) continue;
     r.recipientIds.push(id);
     s.tasks.push({ id: nid("tk", s), giverId: id, requestId, status: "EN_ATTENTE" });
-    notify(s, id, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback sur « ${mission?.name ?? "une mission"} ».`, "/app/demandes");
+    notify(s, id, "DEMANDE", "Nouvelle demande de feedback", `${fullName(requester)} vous demande un feedback${mission ? ` sur « ${mission.name} »` : ""}.`, "/app/demandes");
   }
 }
 

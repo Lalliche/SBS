@@ -56,6 +56,7 @@ SBS 360° collects **feedback on people's contribution to a mission**, all year 
 | Anonymous feedback & relation | Q10 default ON | CDC 3.8: relation of the giver shown **except on anonymous feedback** → Q10 default **OFF** (still a toggle) |
 | AI assistant | In scope, switchable | **Optional, not included (sur devis).** In the delivered platform the strengths and development areas are **written by the team leader**. Default `aiMode = MANUEL`; the AI screens remain as a clearly labelled "Option sur devis" preview. |
 | Feedback request | nominative | nominative **and also received by e-mail** by the recipient |
+| Post-contract changes (17 Nov 2026) | request needs a mission; relation only from the reporting line | **Anyone can ask or give to anyone** (no direction restriction). Relation proposed by reporting line, else by grade, correctable. **Mission optional** on a request; required "role on the mission" when one is chosen; optional hours (**no minimum-hours rule**). "Retourner la demande" (reason, correct and resend). Direction counters on Accueil. Question "Comment avez-vous travaillé ensemble ?" for downward/peer only. Hierarchy import column + bulk assignment. French only for now. |
 | Per-mission view | — | "**Mes missions, mes feedbacks**": per mission, the feedback I received |
 | Out of scope (sur devis, never built) | PDI, org chart | AI assistant, SAP, voice answer for client link, SMS reminders, intranet link, integration with the annual-evaluation tool, development plan. Self-evaluation / weights / global score: excluded by principle. |
 

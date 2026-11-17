@@ -1,5 +1,5 @@
 /* Every figure shown in the UI is computed here from the store (spec hard rule 2). */
-import { addDays, average, competencyStats, cycleProgress, quotaProgress, relationLabel } from "./engine";
+import { addDays, average, competencyStats, cycleProgress, quotaProgress, relationLabel, suggestedRelation } from "./engine";
 import { openCycle, feedbackItemsFor } from "./actions";
 import type { AnonymousFeedback, AppState, Cycle, FeedbackRequest, NamedFeedback, Relation, User } from "./types";
 
@@ -129,6 +129,38 @@ export function requestProgress(s: AppState, r: FeedbackRequest): RequestProgres
     pendingNamedUnknown: Math.max(0, r.recipientIds.length - namedReplies.length - anonymous),
   };
 }
+/** Requests the person sent that an evaluator sent back (to correct and resend). */
+export function returnedTasksOf(s: AppState, requestId: string) {
+  return s.tasks.filter((t) => t.requestId === requestId && t.status === "RETOURNEE");
+}
+
+/**
+ * Home counters by direction. Direction = how the feedback reaches the person:
+ * from above (Descendant), from a peer (Pair) or from below (Ascendant).
+ * Anonymous feedback is counted apart: it never carries a direction unless the visibility rule shows it.
+ */
+export interface DirectionCount { RESPONSABLE: number; PAIR: number; EQUIPE: number; anonymous: number }
+export function directionCounts(s: AppState, userId: string, cycleId: string): { asked: DirectionCount; received: DirectionCount } {
+  const zero = (): DirectionCount => ({ RESPONSABLE: 0, PAIR: 0, EQUIPE: 0, anonymous: 0 });
+  const asked = zero();
+  const received = zero();
+  const me = s.users.find((u) => u.id === userId);
+  if (!me) return { asked, received };
+  for (const r of s.requests.filter((x) => x.requesterId === userId && x.cycleId === cycleId)) {
+    for (const gid of r.recipientIds) {
+      const g = s.users.find((u) => u.id === gid);
+      const rel = g ? suggestedRelation(g, me) : null;
+      if (rel) asked[rel] += 1;
+    }
+  }
+  for (const f of s.named.filter((x) => x.recipientId === userId && x.cycleId === cycleId && x.status === "ENVOYE")) received[f.relation] += 1;
+  for (const f of s.anonymous.filter((x) => x.recipientId === userId && x.cycleId === cycleId && !x.hiddenByHR)) {
+    if (f.relation) received[f.relation] += 1;
+    else received.anonymous += 1;
+  }
+  return { asked, received };
+}
+
 export const requestsBy = (s: AppState, userId: string) => s.requests.filter((r) => r.requesterId === userId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
 /* ---------- Competency stats / radar ---------- */

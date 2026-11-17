@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { average, can, clientLinkValidity, competencyStats, evolution, questionBankWarning, quotaProgress, relationOf } from "./engine";
+import { average, can, clientLinkValidity, competencyStats, evolution, questionBankWarning, quotaProgress, relationOf, suggestedRelation } from "./engine";
 import { buildSeed } from "./seed";
-import { giveAnonymous, giveNamed, completeTaskAnonymously } from "./actions";
-import { feedbackAbout, sentBy } from "./selectors";
+import { giveAnonymous, giveNamed, completeTaskAnonymously, createRequest, resendTask, returnTask } from "./actions";
+import { directionCounts, feedbackAbout, returnedTasksOf, sentBy } from "./selectors";
 import type { AppState } from "./types";
 
 const seed = (n: 1 | 2 | 3 | 4 = 2): AppState => buildSeed(n);
@@ -144,5 +144,61 @@ describe("anonymity guarantees", () => {
     const s = seed(3);
     const json = JSON.parse(JSON.stringify(s.anonymous)) as Array<Record<string, unknown>>;
     json.forEach((r) => expect(Object.keys(r).some((k) => AUTHOR_LIKE.test(k))).toBe(false));
+  });
+});
+
+describe("post-contract changes (17 Nov 2026)", () => {
+  const rank = { Junior: 0, Consultant: 1, Senior: 2, Manager: 3, Directeur: 4 } as const;
+  it("relation: the reporting line wins, otherwise grades decide, so anyone can reach anyone", () => {
+    const s = seed();
+    expect(suggestedRelation(u(s, "thomas"), u(s, "lucas"))).toBe("RESPONSABLE");
+    expect(suggestedRelation(u(s, "lucas"), u(s, "lucas"))).toBeNull();
+    let checked = 0;
+    for (const a of s.users)
+      for (const b of s.users) {
+        if (a.id === b.id || relationOf(a, b) || rank[a.grade] === rank[b.grade]) continue;
+        expect(suggestedRelation(a, b)).toBe(rank[a.grade] > rank[b.grade] ? "RESPONSABLE" : "EQUIPE");
+        checked++;
+      }
+    expect(checked).toBeGreaterThan(50);
+    const peers = s.users.filter((x) => x.grade === "Senior");
+    const pair = peers.flatMap((a) => peers.filter((b) => b.id !== a.id && !relationOf(a, b)).map((b) => [a, b] as const))[0];
+    expect(suggestedRelation(pair[0], pair[1])).toBe("PAIR");
+  });
+  it("a request can target anyone and needs no mission; hours and role are informative", () => {
+    const s = seed();
+    const id = createRequest(s, u(s, "lucas").id, { missionId: null, recipientIds: [u(s, "thomas").id, u(s, "karim").id], message: "", dueDate: s.now, allowAnonymous: true });
+    const r = s.requests.find((x) => x.id === id)!;
+    expect(r.missionId).toBeNull();
+    expect(s.tasks.filter((t) => t.requestId === id)).toHaveLength(2);
+    const id2 = createRequest(s, u(s, "lucas").id, { missionId: "m-01", role: " Cadrage ", hours: 12, recipientIds: [u(s, "claire").id], message: "", dueDate: s.now, allowAnonymous: true });
+    expect(s.requests.find((x) => x.id === id2)).toMatchObject({ role: "Cadrage", hours: 12 });
+  });
+  it("a returned request tells the requester, can be corrected and resent", () => {
+    const s = seed();
+    const lucas = u(s, "lucas").id;
+    const claire = u(s, "claire").id;
+    const id = createRequest(s, lucas, { missionId: "m-01", role: "Cadrage", recipientIds: [claire], message: "a", dueDate: s.now, allowAnonymous: true });
+    returnTask(s, claire, id, "Je ne suis pas la bonne personne.");
+    expect(returnedTasksOf(s, id)).toHaveLength(1);
+    expect(s.notifications.some((n) => n.userId === lucas && n.title.includes("retournée"))).toBe(true);
+    expect(s.tasks.find((t) => t.requestId === id)!.status).toBe("RETOURNEE");
+    resendTask(s, lucas, id, claire, { role: "Cadrage et animation", message: "b" });
+    expect(returnedTasksOf(s, id)).toHaveLength(0);
+    expect(s.tasks.find((t) => t.requestId === id)!.status).toBe("EN_ATTENTE");
+    expect(s.requests.find((x) => x.id === id)).toMatchObject({ role: "Cadrage et animation", message: "b" });
+  });
+  it("direction counters: anonymous feedback only carries a direction when the rule shows it", () => {
+    const s = seed();
+    const c = directionCounts(s, u(s, "lucas").id, s.requests[0].cycleId);
+    const named = s.named.filter((f) => f.recipientId === u(s, "lucas").id).length;
+    expect(c.received.RESPONSABLE + c.received.PAIR + c.received.EQUIPE + c.received.anonymous).toBeGreaterThanOrEqual(named);
+    if (!s.settings.visibility.showRelationOnAnonymous) expect(c.received.anonymous).toBe(s.anonymous.filter((f) => f.recipientId === u(s, "lucas").id && !f.hiddenByHR).length);
+  });
+  it("'how did you work together' is asked for downward and peer feedback only", () => {
+    const s = seed();
+    const q = s.questions.find((x) => x.id === "q-0")!;
+    expect(q.appliesTo).toEqual(["RESPONSABLE", "PAIR"]);
+    expect(questionBankWarning(s.questions)).toBeNull();
   });
 });

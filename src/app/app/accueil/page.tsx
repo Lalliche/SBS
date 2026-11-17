@@ -5,7 +5,7 @@ import { Callout, PageHeader, Skeleton } from "@/components/ui/Surface";
 import { Button } from "@/components/ui/Button";
 import { useShell } from "@/components/app/ShellContext";
 import { useFirstLoad } from "@/components/app/useSkeleton";
-import { CollabTasks, GiveCard, LatestReceived, QuotaCard, RecentMissions } from "@/components/app/home/Collab";
+import { CollabTasks, DirectionCounters, GiveCard, LatestReceived, QuotaCard, RecentMissions } from "@/components/app/home/Collab";
 import { RecentTeamFeedback, SynthesesToWrite, TeamOverview } from "@/components/app/home/Team";
 import { RhHome } from "@/components/app/home/Rh";
 import { TechHome } from "@/components/app/home/Tech";
@@ -67,6 +67,7 @@ export default function AccueilPage() {
               <GiveCard />
             </div>
           </div>
+          <DirectionCounters />
           {me.role === "RESPONSABLE" && (
             <>
               <TeamOverview />

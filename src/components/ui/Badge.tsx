@@ -45,6 +45,7 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   EN_ATTENTE: { label: "En attente", tone: "warning" },
   TRAITEE: { label: "Traitée", tone: "success" },
   DECLINEE: { label: "Déclinée", tone: "neutral" },
+  RETOURNEE: { label: "Retournée", tone: "warning" },
   ACTIF: { label: "Actif", tone: "success" },
   EXPIRE: { label: "Expiré", tone: "danger" },
   DESACTIVE: { label: "Désactivé", tone: "neutral" },

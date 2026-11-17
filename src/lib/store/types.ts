@@ -6,7 +6,7 @@ export type GradeBand = "JUNIOR" | "CONFIRME" | "SENIOR";
 export type Grade = "Junior" | "Consultant" | "Senior" | "Manager" | "Directeur";
 export type CycleStatus = "A_VENIR" | "OUVERT" | "ARCHIVE";
 export type MissionStatus = "EN_COURS" | "TERMINEE";
-export type TaskStatus = "EN_ATTENTE" | "TRAITEE" | "DECLINEE";
+export type TaskStatus = "EN_ATTENTE" | "TRAITEE" | "DECLINEE" | "RETOURNEE";
 export type SynthesisStatus = "NON_COMMENCEE" | "EN_REDACTION" | "VALIDEE";
 export type LinkStatus = "ACTIF" | "EXPIRE" | "DESACTIVE";
 export type AiMode = "OFF" | "MANUEL" | "ASSISTE";
@@ -81,7 +81,12 @@ export interface Mission {
 export interface FeedbackRequest {
   id: string;
   cycleId: string;
-  missionId: string;
+  /** Post-contract change: a request may target anyone, with or without a mission. */
+  missionId: string | null;
+  /** The requester's role on the mission (required when a mission is chosen). */
+  role?: string;
+  /** Optional: hours the requester spent on the mission. Informative only, never a limit. */
+  hours?: number;
   requesterId: string;
   recipientIds: string[]; // people asked to give feedback
   message: string;
@@ -114,6 +119,10 @@ export interface Question {
   kind: "COLLAB" | "CLIENT";
   order: number;
   active: boolean;
+  /** Label shown instead of "Commentaire libre" for a question without competency. */
+  topic?: string;
+  /** Relations (giver → recipient) for which this question is asked. Absent = all. */
+  appliesTo?: Relation[];
   /** variants[relation][gradeBand] */
   variants: Record<Relation, Record<GradeBand, string>>;
   clientText?: string;

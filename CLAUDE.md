@@ -73,6 +73,17 @@ Next 16 (App Router, React 19) · Tailwind v4 · `motion` · `lucide-react` · c
 
 `npm run dev` · `npm run build` · `npm run lint` · `npm test`
 
+## Post-contract changes (17 Nov 2026) — implemented
+
+From the PwC "Feedback Exchange" scans sent by SBS and the technical meeting (`docs/MODIFICATIONS_POST_CONTRAT_2026-11-17.md`). `STATE_VERSION` is 5.
+- Direction by grade when there is no reporting line (`suggestedRelation`), shown and correctable in the wizard; no restriction on who can ask or give to whom.
+- Request: mission optional, required "role on the mission" when one is chosen, optional hours (informative, **no minimum-hours rule**: SBS handles it), mission search by OTP, recap before sending.
+- Mes demandes: "Retourner" (reason, requester corrects and resends, status `RETOURNEE`).
+- Accueil: direction counters. Question q-0 "Comment avez-vous travaillé ensemble ?" asked for downward/peer only.
+- Hierarchy: import column "responsable", bulk "Affecter un responsable", "sans responsable" to-do callout.
+- French only (English later). Not copied from PwC: one evaluator per request, mission mandatory for downward, add a mission by hand.
+- Still open: "Synchronisation" screen (SBS system sync), not built. Visual QA of these changes not done (browser extension was unavailable); only build, lint, 22 tests and HTTP 200 on the changed routes.
+
 ## Status (end of session 1)
 
 Built and verified (`npm run build`, `npm run lint`, `npm test` all pass; 14 engine/anonymity tests):

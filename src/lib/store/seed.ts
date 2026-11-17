@@ -20,7 +20,7 @@ import type {
   User,
 } from "./types";
 
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 /* ---------- PRNG ---------- */
 export function mulberry32(seed: number) {
@@ -120,6 +120,7 @@ function buildUsers(): User[] {
   }));
 }
 
+const TOGETHER_TEXT = "Comment avez-vous travaillé ensemble ? Dans quel contexte, et sur quoi ?";
 const questionKeys: Array<[string, string | null]> = [
   ["q-1", "c-inspirer"],
   ["q-2", "c-developper"],
@@ -138,6 +139,17 @@ function buildQuestions(): Question[] {
     active: true,
     variants: buildVariants(comp ?? "comment"),
   }));
+  // Post-contract change (PwC reference): asked for downward and peer feedback only.
+  const together: Question = {
+    id: "q-0",
+    competencyId: null,
+    kind: "COLLAB",
+    order: 0,
+    active: true,
+    topic: "Collaboration",
+    appliesTo: ["RESPONSABLE", "PAIR"],
+    variants: Object.fromEntries((["RESPONSABLE", "PAIR", "EQUIPE"] as const).map((r) => [r, { JUNIOR: TOGETHER_TEXT, CONFIRME: TOGETHER_TEXT, SENIOR: TOGETHER_TEXT }])) as Question["variants"],
+  };
   const client: Question[] = CLIENT_QUESTIONS.map((c, i) => ({
     id: c.id,
     competencyId: null,
@@ -147,7 +159,7 @@ function buildQuestions(): Question[] {
     variants: buildVariants("comment"),
     clientText: c.text,
   }));
-  return [...collab, ...client];
+  return [together, ...collab, ...client];
 }
 
 /* ---------- Missions ---------- */
@@ -372,14 +384,14 @@ export function buildSeed(scenario: Scenario, sessionUserId: string | null = nul
   const tasks: PendingTask[] = [];
   let rId = 1;
   let tId = 1;
-  const mkRequest = (requester: string, mission: string, recipients: string[], created: string, due: string, message: string, claim: Record<string, "pending" | "named" | "anon" | "declined">) => {
-    if (!missions.some((m) => m.id === mission)) return;
-    const req: AppState["requests"][number] = { id: `rq-${rId++}`, cycleId: feedCycleId, missionId: mission, requesterId: uid(requester), recipientIds: recipients.map(uid), message, createdAt: created, dueDate: due, allowAnonymous: true, anonymousReplies: 0 };
+  const mkRequest = (requester: string, mission: string | null, recipients: string[], created: string, due: string, message: string, claim: Record<string, "pending" | "named" | "anon" | "declined" | "returned">, extra?: { role?: string; hours?: number }) => {
+    if (mission && !missions.some((m) => m.id === mission)) return;
+    const req: AppState["requests"][number] = { id: `rq-${rId++}`, cycleId: feedCycleId, missionId: mission, role: extra?.role, hours: extra?.hours, requesterId: uid(requester), recipientIds: recipients.map(uid), message, createdAt: created, dueDate: due, allowAnonymous: true, anonymousReplies: 0 };
     requests.push(req);
     for (const r of recipients) {
       const st = claim[r] ?? "pending";
-      const status = st === "pending" ? "EN_ATTENTE" : st === "declined" ? "DECLINEE" : "TRAITEE";
-      tasks.push({ id: `tk-${tId++}`, giverId: uid(r), requestId: req.id, status: status as PendingTask["status"], reason: st === "declined" ? "Je n’ai pas travaillé assez directement avec vous sur cette mission." : undefined });
+      const status = st === "pending" ? "EN_ATTENTE" : st === "declined" ? "DECLINEE" : st === "returned" ? "RETOURNEE" : "TRAITEE";
+      tasks.push({ id: `tk-${tId++}`, giverId: uid(r), requestId: req.id, status: status as PendingTask["status"], reason: st === "declined" ? "Je n’ai pas travaillé assez directement avec vous sur cette mission." : st === "returned" ? "Nous n’avons pas travaillé ensemble sur cette mission : je ne suis pas la bonne personne." : undefined });
       if (st === "named") pushFeedback(uid(r), uid(requester), mission, addDays(created, 2 + (tId % 4)), false, { requestId: req.id });
       if (st === "anon") {
         pushFeedback(uid(r), uid(requester), mission, addDays(created, 2 + (tId % 4)), true);
@@ -390,13 +402,16 @@ export function buildSeed(scenario: Scenario, sessionUserId: string | null = nul
   if (scenario >= 2) {
     const d = (n: number) => addDays(now, n);
     // Claire's 3 pending requests, one due within 3 days
-    mkRequest("yanis", "m-01", ["claire", "imane", "lucas"], d(-6), d(2), "Ton retour sur ma contribution au volet gouvernance m’aiderait beaucoup, merci.", { imane: "named", lucas: "pending" });
-    mkRequest("imane", "m-13", ["claire", "yanis"], d(-9), d(12), "Peux-tu me donner ton avis sur le diagnostic ? Merci d’avance.", { yanis: "named" });
+    mkRequest("yanis", "m-01", ["claire", "imane", "lucas"], d(-6), d(2), "Ton retour sur ma contribution au volet gouvernance m’aiderait beaucoup, merci.", { imane: "named", lucas: "pending" }, { role: "Cadrage et animation des ateliers du volet gouvernance.", hours: 64 });
+    mkRequest("imane", "m-13", ["claire", "yanis"], d(-9), d(12), "Peux-tu me donner ton avis sur le diagnostic ? Merci d’avance.", { yanis: "named" }, { role: "Analyse documentaire et rédaction du diagnostic." });
     mkRequest("nadia", "m-06", ["claire", "thomas", "lucas"], d(-3), d(17), "J’aimerais avoir un retour sur mon travail de cartographie.", { thomas: "named" });
     // A few historic requests
     mkRequest("samir", "m-04", ["meriem", "imane", "nadia", "leila"], d(-20), d(-4), "Retour sur la phase d’audit terrain.", { meriem: "named", imane: "anon", nadia: "named", leila: "declined" });
-    mkRequest("mehdi", "m-03", ["lina", "sarah", "amine"], d(-14), d(6), "Retour sur la conception du modèle de données.", { lina: "named", sarah: "anon" });
+    mkRequest("mehdi", "m-03", ["lina", "sarah", "amine"], d(-14), d(6), "Retour sur la conception du modèle de données.", { lina: "named", sarah: "anon" }, { role: "Conception du modèle de données et revue de l’architecture." });
     mkRequest("houda", "m-09", ["sophie", "imane", "soraya"], d(-10), d(9), "Retour sur l’animation des ateliers.", { sophie: "named" });
+    // Post-contract: a request without mission, and one returned by its evaluator.
+    mkRequest("nadia", null, ["sarah", "amine"], d(-5), d(9), "Un retour d’ensemble sur notre collaboration cette année m’aiderait.", {});
+    mkRequest("mehdi", "m-03", ["amine", "lina"], d(-4), d(10), "Retour sur mon accompagnement de l’équipe.", { amine: "returned" }, { role: "Pilotage de la mission et suivi de l’équipe." });
   }
   named.sort((x, y) => x.createdAt.localeCompare(y.createdAt));
   anonymous.sort((x, y) => x.createdAt.localeCompare(y.createdAt));

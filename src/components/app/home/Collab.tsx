@@ -3,9 +3,10 @@ import { ArrowRight, CheckCircle2, ClipboardCheck, Inbox, Send, Target } from "l
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { fmtDay, fmtNum, relDate, daysBetween, fullName } from "@/lib/store/engine";
+import { directionHint, directionLabel, fmtDay, fmtNum, relDate, daysBetween, fullName } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
-import { feedbackAbout, finishedWithoutRequest, missionsOf, pendingTasks, quotaFor } from "@/lib/store/selectors";
+import { directionCounts, feedbackAbout, finishedWithoutRequest, missionsOf, pendingTasks, quotaFor } from "@/lib/store/selectors";
+import type { Relation } from "@/lib/store/types";
 import { AvatarStack } from "@/components/ui/Avatar";
 import { Badge, StatusPill } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -111,6 +112,40 @@ export function GiveCard() {
         </Button>
       </div>
     </section>
+  );
+}
+
+const DIRECTIONS: Relation[] = ["RESPONSABLE", "PAIR", "EQUIPE"];
+
+/** Counters of requests sent and feedback received, by direction (descendant / pair / ascendant). */
+export function DirectionCounters() {
+  const { s, me, cycle } = useSession();
+  if (!me) return null;
+  const { asked, received } = directionCounts(s, me.id, cycle.id);
+  const blocks = [
+    { key: "asked", title: "Demandes envoyées", data: asked },
+    { key: "received", title: "Feedbacks reçus", data: received },
+  ] as const;
+  return (
+    <Card data-tour="directions">
+      <CardHeader title="Vos feedbacks en un coup d’œil" description="Par direction : de quelqu’un de plus senior (descendant), d’un pair, ou de quelqu’un de plus junior (ascendant)." />
+      <div className="grid gap-6 sm:grid-cols-2">
+        {blocks.map((b) => (
+          <div key={b.key}>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-text-muted">{b.title}</p>
+            <div className="grid grid-cols-3 gap-3">
+              {DIRECTIONS.map((d) => (
+                <div key={d} title={directionHint[d]} className="rounded-lg border border-border px-3 py-3 text-center">
+                  <p className="text-xl font-semibold tabular-nums text-ink">{b.data[d]}</p>
+                  <p className="mt-0.5 text-xs text-text-secondary">{directionLabel[d]}</p>
+                </div>
+              ))}
+            </div>
+            {b.key === "received" && b.data.anonymous > 0 && <p className="mt-2 text-xs text-text-muted">+ <span className="tabular-nums font-medium text-text">{b.data.anonymous}</span> anonyme{b.data.anonymous > 1 ? "s" : ""}, sans direction affichée.</p>}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
