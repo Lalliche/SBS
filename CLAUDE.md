@@ -75,12 +75,13 @@ Next 16 (App Router, React 19) · Tailwind v4 · `motion` · `lucide-react` · c
 
 ## Post-contract changes (17 Nov 2026) — implemented
 
-From the PwC "Feedback Exchange" scans sent by SBS and the technical meeting (`docs/MODIFICATIONS_POST_CONTRAT_2026-11-17.md`). `STATE_VERSION` is 5.
+From the PwC "Feedback Exchange" scans sent by SBS and the technical meeting (`docs/MODIFICATIONS_POST_CONTRAT_2026-11-17.md`). `STATE_VERSION` was 5 (now 6, see below).
 - Direction by grade when there is no reporting line (`suggestedRelation`), shown and correctable in the wizard; no restriction on who can ask or give to whom.
 - Request: mission optional, required "role on the mission" when one is chosen, optional hours (informative, **no minimum-hours rule**: SBS handles it), mission search by OTP, recap before sending.
 - Mes demandes: "Retourner" (reason, requester corrects and resends, status `RETOURNEE`).
 - Accueil: direction counters. Question q-0 "Comment avez-vous travaillé ensemble ?" asked for downward/peer only.
 - Hierarchy: import column "responsable", bulk "Affecter un responsable", "sans responsable" to-do callout.
+- Anyone adds a mission: `anyoneCreatesMission` (Q13) is ON by default; "Ajouter une mission" in the request drawer (name only required; `Mission.client?`, empty OTP / 0 h allowed, shown as "—"). `STATE_VERSION` is now 6. HR still never creates missions.
 - French only (English later). Not copied from PwC: one evaluator per request, mission mandatory for downward, add a mission by hand.
 - Still open: "Synchronisation" screen (SBS system sync), not built. Visual QA of these changes not done (browser extension was unavailable); only build, lint, 22 tests and HTTP 200 on the changed routes.
 

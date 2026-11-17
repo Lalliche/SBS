@@ -42,7 +42,7 @@ export default function MissionPage({ params }: PageProps<"/app/missions/[id]">)
   const participants = useMemo(() => (m ? s.users.filter((u) => m.participantIds.includes(u.id)) : []), [m, s.users]);
   if (!m || !me) return me ? notFound() : null;
   const lead = s.users.find((u) => u.id === m.leadId);
-  const canEdit = (m.leadId === me.id || (can("mission.create") && m.participantIds.includes(me.id))) && !readOnly;
+  const canEdit = (m.leadId === me.id || (me.role === "RESPONSABLE" && m.participantIds.includes(me.id))) && !readOnly;
   const isParticipant = m.participantIds.includes(me.id);
   const requests = s.requests.filter((r) => r.missionId === m.id);
   const pendingCount = s.tasks.filter((t) => t.status === "EN_ATTENTE" && requests.some((r) => r.id === t.requestId)).length;
@@ -74,7 +74,7 @@ export default function MissionPage({ params }: PageProps<"/app/missions/[id]">)
       <PageHeader
         breadcrumb={[{ label: "Missions", href: "/app/missions" }, { label: m.name }]}
         title={m.name}
-        description={<span className="flex flex-wrap items-center gap-2"><StatusPill status={m.status} /> <span className="font-mono text-xs">{m.otp}</span> · {fmtDate(m.startDate)} → {fmtDate(m.endDate)} · {m.hours} h</span>}
+        description={<span className="flex flex-wrap items-center gap-2"><StatusPill status={m.status} /> {m.client && <span>{m.client} ·</span>} {m.otp && <span className="font-mono text-xs">{m.otp}</span>} {m.otp && "·"} {fmtDate(m.startDate)} → {fmtDate(m.endDate)}{m.hours ? ` · ${m.hours} h` : ""}</span>}
         actions={isParticipant && !readOnly ? <Button onClick={() => shell.openRequest({ missionId: m.id })}>Demander un feedback</Button> : undefined}
       />
       <Tabs label="Mission" className="mb-6" value={tab} onChange={setTab} items={[{ value: "apercu", label: "Aperçu" }, { value: "participants", label: "Participants", count: participants.length }, { value: "feedbacks", label: "Feedbacks" }, ...(isParticipant || m.leadId === me.id ? [{ value: "mesfeedbacks" as const, label: "Mes feedbacks" }] : []), ...(can("clientlink.manage") && (isParticipant || m.leadId === me.id) ? [{ value: "client" as const, label: "Feedback client" }] : []), ...(canEdit ? [{ value: "parametres" as const, label: "Paramètres" }] : [])]} />

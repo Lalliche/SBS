@@ -15,7 +15,7 @@ function greeting(role: string, name: string, tasks: string) {
 }
 
 export default function AccueilPage() {
-  const { s, me } = useSession();
+  const { s, me, can } = useSession();
   const loading = useFirstLoad();
   const shell = useShell();
   if (!me) return null;
@@ -48,6 +48,8 @@ export default function AccueilPage() {
               <Button variant="secondary" href="/app/feedback-client">Retours client</Button>
               <Button onClick={shell.openMission}>Nouvelle mission</Button>
             </>
+          ) : can("mission.create") ? (
+            <Button onClick={shell.openMission}>Nouvelle mission</Button>
           ) : undefined
         }
       />

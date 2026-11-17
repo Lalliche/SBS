@@ -56,7 +56,7 @@ SBS 360° collects **feedback on people's contribution to a mission**, all year 
 | Anonymous feedback & relation | Q10 default ON | CDC 3.8: relation of the giver shown **except on anonymous feedback** → Q10 default **OFF** (still a toggle) |
 | AI assistant | In scope, switchable | **Optional, not included (sur devis).** In the delivered platform the strengths and development areas are **written by the team leader**. Default `aiMode = MANUEL`; the AI screens remain as a clearly labelled "Option sur devis" preview. |
 | Feedback request | nominative | nominative **and also received by e-mail** by the recipient |
-| Post-contract changes (17 Nov 2026) | request needs a mission; relation only from the reporting line | **Anyone can ask or give to anyone** (no direction restriction). Relation proposed by reporting line, else by grade, correctable. **Mission optional** on a request; required "role on the mission" when one is chosen; optional hours (**no minimum-hours rule**). "Retourner la demande" (reason, correct and resend). Direction counters on Accueil. Question "Comment avez-vous travaillé ensemble ?" for downward/peer only. Hierarchy import column + bulk assignment. French only for now. |
+| Post-contract changes (17 Nov 2026) | request needs a mission; relation only from the reporting line | **Anyone can ask or give to anyone** (no direction restriction). Relation proposed by reporting line, else by grade, correctable. **Mission optional** on a request; required "role on the mission" when one is chosen; optional hours (**no minimum-hours rule**). "Retourner la demande" (reason, correct and resend). Direction counters on Accueil. Question "Comment avez-vous travaillé ensemble ?" for downward/peer only. Hierarchy import column + bulk assignment. French only for now. **Anyone can add a mission by hand** from the request form ("Ajouter une mission": name required; client, hours, OTP optional) and from "Nouvelle mission" (Q13 ON by default). |
 | Per-mission view | — | "**Mes missions, mes feedbacks**": per mission, the feedback I received |
 | Out of scope (sur devis, never built) | PDI, org chart | AI assistant, SAP, voice answer for client link, SMS reminders, intranet link, integration with the annual-evaluation tool, development plan. Self-evaluation / weights / global score: excluded by principle. |
 
@@ -121,7 +121,7 @@ Roles: `COLLABORATEUR`, `RESPONSABLE` (also a collaborateur), `ADMIN_RH`, `ADMIN
 | Giver's relation is shown on anonymous feedback (Q10) — CDC 3.8 says *except anonymous* | **OFF** |
 | Admin RH may hide an inappropriate anonymous text (Q11) | ON |
 | Anonymous feedback counts in quotas (Q12) | ON |
-| Any collaborateur may create a mission (Q13) — HR never does | OFF |
+| Any collaborateur may create a mission (Q13) — HR never does | **ON** (SBS request, 17 Nov 2026) |
 | Collaborateur sees average per competency (Q22) | ON |
 | PDF of the synthesis can be given to the collaborateur (Q35) | ON |
 

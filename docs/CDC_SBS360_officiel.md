@@ -119,7 +119,7 @@ Un même collaborateur peut cumuler plusieurs profils. Les règles précises de 
 
 ### 3.4 Missions
 
-Les missions sont créées et gérées par les responsables, pas par les RH.
+Les missions sont créées et gérées par les responsables, pas par les RH. Depuis la demande de SBS du 17 novembre 2026, tout collaborateur peut aussi ajouter une mission lui-même au moment de créer une demande de feedback (nom obligatoire ; client, heures et code OTP facultatifs). Les responsables gardent la création complète (participants, dates) et le pilotage.
 
 - Création d'une mission : nom, numéro OTP, durée ou nombre d'heures, personne responsable, participants.
 - Un collaborateur peut participer à plusieurs missions.

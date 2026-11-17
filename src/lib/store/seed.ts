@@ -20,7 +20,7 @@ import type {
   User,
 } from "./types";
 
-export const STATE_VERSION = 5;
+export const STATE_VERSION = 6;
 
 /* ---------- PRNG ---------- */
 export function mulberry32(seed: number) {
@@ -198,7 +198,7 @@ function buildSettings(): Settings {
       showRelationOnAnonymous: false, // CDC 3.8: the giver's relation is shown except on anonymous feedback
       rhCanHideAnonymous: true,
       anonymousCountsInQuota: true,
-      anyoneCreatesMission: false,
+      anyoneCreatesMission: true, // SBS (Nov 2026): every collaborateur can add a mission, like "Ajouter un projet" on Feedback Exchange
       feedbackWithoutMission: true,
       radarByRelation: true,
       seeCompetencyAverage: true,

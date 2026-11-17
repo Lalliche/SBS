@@ -20,7 +20,9 @@ import type {
   User,
 } from "./types";
 
-let counter = 0;
+// Random start: the counter resets on every page load while state persists in localStorage, so a
+// fixed start would reissue ids already stored (e.g. a new mission colliding with an older one).
+let counter = Math.floor(Math.random() * 1e9);
 const nid = (p: string, s: AppState) => `${p}-${hashString(s.now + (counter++).toString(36)).toString(36)}${counter.toString(36)}`;
 
 export function openCycle(s: AppState) {

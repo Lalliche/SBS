@@ -308,3 +308,6 @@ export function cycleProgress(start: string, end: string, now: string) {
   const n = new Date(now).getTime();
   return Math.min(1, Math.max(0, (n - s) / (e - s)));
 }
+
+/** "Name · OTP", or just the name for a mission added by hand without a code. */
+export const missionLabel = (m: { name: string; otp: string }) => (m.otp ? `${m.name} · ${m.otp}` : m.name);

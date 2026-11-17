@@ -13,6 +13,12 @@ const useMounted = () => useSyncExternalStore(() => () => {}, () => true, () => 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input:not([type=hidden]),select,[tabindex]:not([tabindex="-1"])';
 
 function useOverlayBehavior(open: boolean, onRequestClose: () => void, panel: React.RefObject<HTMLElement | null>) {
+  // Keep the latest close handler in a ref: an inline `onClose` changes identity on every parent
+  // render, and re-running the effect below would steal the focus back (typing lost after one key).
+  const closeRef = useRef(onRequestClose);
+  useEffect(() => {
+    closeRef.current = onRequestClose;
+  });
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
@@ -23,7 +29,7 @@ function useOverlayBehavior(open: boolean, onRequestClose: () => void, panel: Re
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onRequestClose();
+        closeRef.current();
       }
       if (e.key === "Tab" && panel.current) {
         const els = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null);
@@ -48,7 +54,7 @@ function useOverlayBehavior(open: boolean, onRequestClose: () => void, panel: Re
       document.body.style.overflow = prevOverflow;
       prev?.focus?.();
     };
-  }, [open, onRequestClose, panel]);
+  }, [open, panel]);
 }
 
 function GuardBar({ onStay, onLeave }: { onStay: () => void; onLeave: () => void }) {

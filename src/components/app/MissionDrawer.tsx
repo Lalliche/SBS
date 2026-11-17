@@ -31,7 +31,7 @@ function Form({ onClose }: { onClose: () => void }) {
   const [desc, setDesc] = useState("");
   const [start, setStart] = useState(s.now.slice(0, 10));
   const [end, setEnd] = useState("");
-  const [lead, setLead] = useState("");
+  const [lead, setLead] = useState(me?.id ?? "");
   const [people, setPeople] = useState<string[]>([]);
   const [touched, setTouched] = useState(false);
   if (!me) return null;

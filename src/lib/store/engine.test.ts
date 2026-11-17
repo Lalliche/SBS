@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { average, can, clientLinkValidity, competencyStats, evolution, questionBankWarning, quotaProgress, relationOf, suggestedRelation } from "./engine";
 import { buildSeed } from "./seed";
-import { giveAnonymous, giveNamed, completeTaskAnonymously, createRequest, resendTask, returnTask } from "./actions";
+import { giveAnonymous, giveNamed, completeTaskAnonymously, createMission, createRequest, resendTask, returnTask } from "./actions";
 import { directionCounts, feedbackAbout, returnedTasksOf, sentBy } from "./selectors";
 import type { AppState } from "./types";
 
@@ -200,5 +200,16 @@ describe("post-contract changes (17 Nov 2026)", () => {
     const q = s.questions.find((x) => x.id === "q-0")!;
     expect(q.appliesTo).toEqual(["RESPONSABLE", "PAIR"]);
     expect(questionBankWarning(s.questions)).toBeNull();
+  });
+  it("anyone can add a mission by hand from a request (name only), SBS request Nov 2026", () => {
+    const s = seed();
+    expect(s.settings.visibility.anyoneCreatesMission).toBe(true);
+    const lucas = u(s, "lucas");
+    const id = createMission(s, lucas.id, { name: "Audit interne", otp: "", hours: 0, description: "", startDate: s.now, endDate: s.cycles.find((c) => c.status === "OUVERT")!.endDate, leadId: lucas.id, participantIds: [lucas.id], client: "Sonatrach" });
+    const m = s.missions.find((x) => x.id === id)!;
+    expect(m.status).toBe("EN_COURS");
+    expect(m.participantIds).toEqual([lucas.id]);
+    const rid = createRequest(s, lucas.id, { missionId: id, role: "Cadrage", recipientIds: [u(s, "claire").id], message: "", dueDate: s.now, allowAnonymous: true });
+    expect(s.requests.find((r) => r.id === rid)!.missionId).toBe(id);
   });
 });

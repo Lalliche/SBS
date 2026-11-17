@@ -6,7 +6,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { act } from "@/lib/store/store";
 import { createClientLink, extendLink, remindClient, sendClientLinkEmail, setLinkStatus } from "@/lib/store/actions";
-import { addDays, clientLinkValidity, fmtDate, relDate } from "@/lib/store/engine";
+import { addDays, clientLinkValidity, fmtDate, missionLabel, relDate } from "@/lib/store/engine";
 import { useSession } from "@/lib/store/hooks";
 import { visibleClientLinks } from "@/lib/store/selectors";
 import { useQueryState } from "@/lib/use-query-state";
@@ -71,7 +71,7 @@ function Wizard({ onClose, preset, onCreated }: { onClose: () => void; preset: P
           <div className="rounded-xl border border-border bg-bg p-6 sm:p-8">
             {step === 0 && (
               <div className="flex flex-col gap-5">
-                <SelectInput label="Mission" required value={mission} onChange={(v) => { setMission(v); setTitle(""); }} placeholder="Choisir une mission" options={myMissions.map((m) => ({ value: m.id, label: `${m.name} · ${m.otp}` }))} hint={touched ? (errs.mission ?? undefined) : undefined} />
+                <SelectInput label="Mission" required value={mission} onChange={(v) => { setMission(v); setTitle(""); }} placeholder="Choisir une mission" options={myMissions.map((m) => ({ value: m.id, label: missionLabel(m) }))} hint={touched ? (errs.mission ?? undefined) : undefined} />
                 <fieldset className="flex flex-col gap-4 rounded-lg border border-border p-4">
                   <legend className="px-1 text-sm font-medium text-ink">Le client — un lien correspond à un seul client</legend>
                   <div className="grid gap-4 sm:grid-cols-2"><TextInput label="Nom du client" required value={client.name} onChange={(v) => setClient({ ...client, name: v })} error={touched ? errs.name : null} /><TextInput label="Entreprise" required value={client.company} onChange={(v) => setClient({ ...client, company: v })} error={touched ? errs.company : null} /></div>

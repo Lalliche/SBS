@@ -16,7 +16,8 @@ export function useSession() {
       open: openCycle(s),
       cycle: viewedCycle(s),
       readOnly: isArchivedView(s),
-      can: (a: Action) => canDo(me, a),
+      // Q13: when "anyone creates a mission" is on, collaborateurs may too (HR never does).
+      can: (a: Action) => canDo(me, a) || (a === "mission.create" && s.settings.visibility.anyoneCreatesMission && me?.role === "COLLABORATEUR"),
     }),
     [s, me],
   );

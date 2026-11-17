@@ -70,6 +70,8 @@ export interface Mission {
   /** CDC 3.4: numéro OTP and budgeted hours. */
   otp: string;
   hours: number;
+  /** Optional client name (a mission added by hand from a request only needs a name). */
+  client?: string;
   description: string;
   startDate: string;
   endDate: string;
